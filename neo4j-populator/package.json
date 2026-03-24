@@ -1,0 +1,13 @@
+{
+  "name": "neo4j-populator",
+  "version": "1.0.0",
+  "description": "Script to create and populate Neo4j dataset",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "neo4j-driver": "^5.18.0"
+  }
+}
