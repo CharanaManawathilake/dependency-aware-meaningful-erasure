@@ -24,4 +24,4 @@ hs_err_pid*
 replay_pid*
 
 # twitter_dataset
-twitter-dataset/
+twitter-dataset/*.csv
