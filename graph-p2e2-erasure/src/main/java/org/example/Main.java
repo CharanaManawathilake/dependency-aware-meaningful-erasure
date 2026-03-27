@@ -45,7 +45,10 @@ public class Main {
 
         checkNonCyclicRules(baseProperties);
 
-        System.out.print("Hello and welcome!");
+        var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
+
+        // TODO:Complete conditional access
+        iterateProperties(instantiator, baseProperties);
     }
 
     private static void parseConfigFile(String jsonString) throws Exception {
@@ -223,5 +226,21 @@ public class Main {
                 }
             }
         }
+    }
+
+    private static void iterateProperties(Instantiator instantiator, Set<Property> properties) throws Exception {
+        writeHeader();
+        HashSet<Cell>[] deletionSets = new HashSet[3];
+
+        for (var prop : properties){
+            System.out.print(prop.toString() + ",");
+
+            var keys = instantiator.getKeys(prop);
+        }
+    }
+
+    private static void writeHeader() {
+        // TODO:Add suitable values
+        System.out.println("Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
     }
 }
