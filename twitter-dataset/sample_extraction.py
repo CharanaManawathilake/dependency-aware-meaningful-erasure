@@ -2,9 +2,10 @@ import pandas as pd
 import os
 
 os.makedirs("samples", exist_ok=True)
+SAMPLE_PROFILES = 2
 
 profiles = pd.read_csv("profile.csv")
-sample_profiles = profiles.sample(n=2, random_state=42)
+sample_profiles = profiles.sample(n=SAMPLE_PROFILES, random_state=42)
 sample_profiles.to_csv("samples/sample_profile.csv", index=False)
 
 profid_set = set(sample_profiles["profid"])

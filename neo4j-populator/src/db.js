@@ -49,8 +49,13 @@ async function setup() {
   `, {}, { database });
 
   await driver.executeQuery(`
-    CREATE CONSTRAINT insertion_event_key IF NOT EXISTS
-    FOR (i:InsertionEvent) REQUIRE i.insertionkey IS UNIQUE
+    CREATE CONSTRAINT profile_insertion_key IF NOT EXISTS
+    FOR (i:ProfileInsertion) REQUIRE i.insertionkey IS UNIQUE
+  `, {}, { database });
+
+  await driver.executeQuery(`
+    CREATE CONSTRAINT post_insertion_key IF NOT EXISTS
+    FOR (i:PostInsertion) REQUIRE i.insertionkey IS UNIQUE
   `, {}, { database });
 }
 

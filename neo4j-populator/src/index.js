@@ -3,10 +3,8 @@ const path = require('path');
 const csv = require("csv-parser");
 const { driver, getSession, closeDriver, clearDatabase, createDatabase, setup } = require('./db');
 
-// Use USE_SAMPLE from .env (true for initial verification, false for full dataset)
 const USE_SAMPLES = process.env.USE_SAMPLE === 'true';
 
-// Helper function to process CSV files in chunks
 async function ingestCSV(filePath, query, batchSize = 10000) {
     if (!fs.existsSync(filePath)) {
         console.warn(`File not found, skipping: ${filePath}`);
@@ -76,13 +74,11 @@ async function populateDatabase() {
         
         const datasetDir = path.join(__dirname, '../../twitter-dataset');
         
-        // Define paths
         const profilePath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_profile.csv' : 'profile.csv');
         const postsPath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_posts.csv' : 'posts.csv');
         const profileInsertionPath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_profile_insertiontime.csv' : 'profile_insertiontime.csv');
         const postsInsertionPath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_posts_insertiontime.csv' : 'posts_insertiontime.csv');
 
-        // 1. Ingest Profiles
         const profileQuery = `
             UNWIND $batch AS row
             MERGE (p:Profile {profid: row.profid})
@@ -102,11 +98,11 @@ async function populateDatabase() {
         console.log('--- Ingesting Profiles ---');
         await ingestCSV(profilePath, profileQuery);
 
-        // 2. Ingest Posts and POSTED relationships
         const postsQuery = `
             UNWIND $batch AS row
             MERGE (post:Post {tweetid: row.tweetid})
             SET post.postdata = row.postdata,
+                post.username = row.username,
                 post.likes = toInteger(row.likes),
                 post.retweets = toInteger(row.retweets),
                 post.quotes = toInteger(row.quotes),
@@ -118,21 +114,38 @@ async function populateDatabase() {
         console.log('--- Ingesting Posts ---');
         await ingestCSV(postsPath, postsQuery);
 
-        // 3. Ingest Profile Insertion Events
         const profileInsertionQuery = `
             UNWIND $batch AS row
-            MERGE (i:InsertionEvent {insertionkey: row.insertionkey})
+            MERGE (i:ProfileInsertion {insertionkey: row.insertionkey})
+            SET i.profpic = row.profpic,
+                i.avglikes = toInteger(row.avglikes),
+                i.totallikes = toInteger(row.totallikes),
+                i.avgreplies = toInteger(row.avgreplies),
+                i.totalreplies = toInteger(row.totalreplies),
+                i.avgretweets = toInteger(row.avgretweets),
+                i.totalretweets = toInteger(row.totalretweets),
+                i.avgquotes = toInteger(row.avgquotes),
+                i.totalquotes = toInteger(row.totalquotes),
+                i.mostusedhashtag = row.mostusedhashtag,
+                i.mostusedhashtagcount = toInteger(row.mostusedhashtagcount),
+                i.pscore = toInteger(row.pscore),
+                i.timestamp = toInteger(row.timestamp)
             MERGE (p:Profile {profid: row.insertionkey})
-            MERGE (p)-[:UPDATED_AT]->(i)
+            MERGE (p)-[:INSERTED_AT]->(i)
         `;
         console.log('--- Ingesting Profile Insertion Events ---');
         await ingestCSV(profileInsertionPath, profileInsertionQuery);
 
-        // 4. Ingest Posts Insertion Events
         const postsInsertionQuery = `
             UNWIND $batch AS row
-            MERGE (i:InsertionEvent {insertionkey: row.insertionkey})
-            SET i.timestamp = row.timeposted
+            MERGE (i:PostInsertion {insertionkey: row.insertionkey})
+            SET i.username = toInteger(row.username),
+                i.postdata = toInteger(row.postdata),
+                i.likes = toInteger(row.likes),
+                i.retweets = toInteger(row.retweets),
+                i.quotes = toInteger(row.quotes),
+                i.replies = toInteger(row.replies),
+                i.timeposted = toInteger(row.timeposted)
             MERGE (post:Post {tweetid: row.insertionkey})
             MERGE (post)-[:INSERTED_AT]->(i)
         `;

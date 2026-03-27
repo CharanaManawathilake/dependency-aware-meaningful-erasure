@@ -4,7 +4,7 @@ This directory contains the data used to populate the Neo4j database for this pr
 
 ## Download Instructions
 
-The full dataset is large (>200MB) and is stored externally. You can download the required CSV files from the following link:
+The full dataset is large (>700MB uncompressed) and is stored externally. You can download the required CSV files from the following link:
 **[Download Dataset](https://my.hidrive.com/lnk/eshsTVV5I)**
 
 Once downloaded, extract the following files directly into this `twitter-dataset` directory:
@@ -25,13 +25,13 @@ The data models a Twitter-like social network and its temporal insertion events.
 ### Relationships
 - `(:Profile)-[:POSTED]->(:Post)`: Maps which profile created which post.
 - `(:Post)-[:INSERTED_AT]->(:InsertionEvent)`: Tracks when a post was ingested.
-- `(:Profile)-[:UPDATED_AT]->(:InsertionEvent)`: Tracks profile metric updates over time.
+- `(:Profile)-[:INSERTED_AT]->(:InsertionEvent)`: Tracks profile metric updates over time.
 
 ## Sample Data (`samples/`)
 
-Because parsing the entire multi-GB dataset takes significant time and memory, this folder also contains a `samples/` directory with a miniature version of the database (currently 2 randomly selected profiles and all their associated posts and insertion events).
+Because parsing the entire multi-GB dataset takes significant time and memory, this folder also contains a `samples/` directory with a miniature version of the database (currently 2 randomly selected profiles and all their associated posts and insertion events).  
 
-These samples maintain all referential integrity thanks to the local extraction script. 
+You can use this sample dataset to perform a dummy run for testing data population and workflow validation before processing the full dataset.
 
 ### Generating New Samples
 If you want to generate a new sample subset from the main CSV files, ensure you have Python and `pandas` installed, then run:

@@ -1,0 +1,4 @@
+p1.totalLikes,p2.Likes,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalQuotes,p2.quotes,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalReplies,p2.replies,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalRetweets,p2.retweets,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
