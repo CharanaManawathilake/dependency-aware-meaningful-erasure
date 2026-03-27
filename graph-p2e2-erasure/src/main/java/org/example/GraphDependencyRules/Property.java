@@ -1,17 +1,17 @@
 package org.example.GraphDependencyRules;
 
-public class Attribute {
+public class Property {
     public String node;
-    public String parameter;
+    public String property;
 
-    public Attribute(String node, String attribute) {
+    public Property(String node, String property) {
         this.node = node;
-        this.parameter = attribute;
+        this.property = property;
     }
 
     @Override
     public String toString() {
-        return node + " " + parameter;
+        return node + " " + property;
     }
 
     @Override
@@ -19,14 +19,14 @@ public class Attribute {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        Attribute attribute1 = (Attribute) o;
+        Property property1 = (Property) o;
 
-        if (!node.equals(attribute1.node)) return false;
-        return parameter.equals(attribute1.parameter);
+        if (!node.equals(property1.node)) return false;
+        return property.equals(property1.property);
     }
 
     @Override
     public int hashCode() {
-        return 31 * node.hashCode() + parameter.hashCode();
+        return 31 * node.hashCode() + property.hashCode();
     }
 }
