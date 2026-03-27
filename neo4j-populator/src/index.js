@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const csv = require("csv-parser");
-const { driver, getSession, closeDriver, clearDatabase, createDatabase, setup } = require('./db');
+const { driver, closeDriver, clearDatabase, createDatabase, setup } = require('./db');
 
 const USE_SAMPLES = process.env.USE_SAMPLE === 'true';
 
