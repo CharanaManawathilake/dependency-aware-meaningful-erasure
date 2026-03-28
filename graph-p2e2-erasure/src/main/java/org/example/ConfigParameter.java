@@ -22,6 +22,8 @@ public class ConfigParameter {
     static long endSchedule = 2;
     static long baseFrequency = 1000;
 
+    static String insertionTimeRelationship = "INSERTED_AT";
+
 
     public static void setDataset(String dataset) {
         ConfigParameter.dataset = dataset;

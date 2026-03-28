@@ -112,6 +112,9 @@ public class Main {
         if (root.has("baseFrequency")) {
             ConfigParameter.baseFrequency = root.getLong("baseFrequency");
         }
+        if (root.has("insertionTimeRelationship")) {
+            ConfigParameter.insertionTimeRelationship = root.getString("insertionTimeRelationship");
+        }
     }
 
     private static void parseRules() throws Exception {
@@ -235,7 +238,11 @@ public class Main {
         for (var prop : properties){
             System.out.print(prop.toString() + ",");
 
-            var keys = instantiator.getKeys(prop);
+            ArrayList<String> keys = instantiator.getKeys(prop);
+             for (String key : keys ){
+                 var deletionPropVal = new Cell(prop, key);
+                 instantiator.completePropVal(deletionPropVal);
+             }
         }
     }
 
