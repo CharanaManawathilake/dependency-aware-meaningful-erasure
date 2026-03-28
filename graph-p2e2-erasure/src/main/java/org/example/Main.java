@@ -145,6 +145,7 @@ public class Main {
             String right = matcher.group(2);
             rule.node2Alias.put(left, right);
             rule.node2Alias.put(right, left);
+            rule.nodes.add(right);
         }
 
         for (int i = 3; i < record.size(); i++) {
@@ -242,6 +243,7 @@ public class Main {
              for (String key : keys ){
                  var deletionPropVal = new Cell(prop, key);
                  instantiator.completePropVal(deletionPropVal);
+                 InstantiatedModel instantiatedModel = new InstantiatedModel(deletionPropVal, instantiator);
              }
         }
     }

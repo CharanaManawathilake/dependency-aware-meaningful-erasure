@@ -11,7 +11,7 @@ public class ConfigParameter {
     public static String database = "p2e2";
     public static String username = "neo4j";
     public static String password = "password";
-    static int numKeys = 10;
+    static int numKeys = 1;
     static boolean batching = false;
     static boolean scheduling = false;
     static boolean averageDependence = false;

@@ -26,39 +26,34 @@ public class InstantiatedModel {
     }
 
     public InstantiatedModel(List<Cell> deletedCells, Instantiator instantiator) throws SQLException {
-//        var start = System.nanoTime(); //? Starts timer
-//        HashMap<Cell, Cell> cell2Identity = new HashMap<>(); //! deduplication
-//        var instantiatedCells = new HashSet<Cell>(); // To prevent reprocessing the same cell
-//
-//        //! Sort on the ascending order of insertion times (compareTo(Cell cell) is defined in Cell.java)
-//        if (deletedCells.size() > 1) {
-//            Collections.sort(deletedCells);
-//        }
-//
-//        //! Initial root map to themselves in the identity map
-//        for (var deleted : deletedCells) {
-//            cell2Identity.put(deleted, deleted);
-//        }
-//
-//        for (var deleted : deletedCells) { //! Process each root cell
-//            //! Continue if Cell already handled
-//            if (!instantiatedCells.add(deleted)) {
-//                continue;
-//            }
-//
-//            HashSet<Cell> nextLevel = new HashSet<>();
-//            HashSet<Cell> currLevel = new HashSet<>();
-//            cell2Parents.put(deleted, new HashSet<>(0)); // Root has no parents
-//            currLevel.add(deleted); // Start traversal from the root
-//
-//            while (!currLevel.isEmpty()) { // BFS style expansion loop
-//                //! Temporary parent mapping for this level only, Merged later
-//                HashMap<Cell, HashSet<Cell>> localCell2Parents = new HashMap<>();
-//
-//                //! Iterate through the cells in the current level
-//                for (var curr : currLevel) { //! curr is a HashSet<Cell>
-//                    var instantiationStart = System.nanoTime(); //Start timeing expansion of this cell
-//                    var result = instatiator.instantiateAttachedCells(curr, deleted.insertionTime);
+        var start = System.nanoTime();
+        HashMap<Cell, Cell> cell2Identity = new HashMap<>();
+        var instantiatedCells = new HashSet<Cell>();
+
+        if (deletedCells.size() > 1) {
+            Collections.sort(deletedCells);
+        }
+
+        for (var deleted : deletedCells) {
+            cell2Identity.put(deleted, deleted);
+        }
+
+        for (var deleted : deletedCells) {
+            if (!instantiatedCells.add(deleted)) {
+                continue;
+            }
+
+            HashSet<Cell> nextLevel = new HashSet<>();
+            HashSet<Cell> currLevel = new HashSet<>();
+            cell2Parents.put(deleted, new HashSet<>(0));
+            currLevel.add(deleted);
+
+            while (!currLevel.isEmpty()) {
+                HashMap<Cell, HashSet<Cell>> localCell2Parents = new HashMap<>();
+
+                for (var curr : currLevel) {
+                    var instantiationStart = System.nanoTime();
+                    var result = instantiator.instantiateAttachedCells(curr, deleted.insertionTime);
 //                    instantiationTime.put(curr, System.nanoTime() - instantiationStart);
 //
 //                    for (var edge : result) { //! results is an arraylist of hyperedges
@@ -88,20 +83,19 @@ public class InstantiatedModel {
 //                            cell2Edge.computeIfAbsent(curr, a -> new ArrayList<>()).add(edge); //! Add curr -> cell2Edge to the map
 //                        }
 //                    }
-//                }
-//                for (var entry : localCell2Parents.entrySet()) {
-//                    cell2Parents.merge(entry.getKey(), entry.getValue(), (a, b) -> {
-//                        a.addAll(b);
-//                        return a;
-//                    });
-//                }
-//                treeLevels.addFirst(currLevel);
-//                currLevel = nextLevel;
-//                nextLevel = new HashSet<>();
-//            }
-//
-//            //! Time between the start and the end
-//            modelConstructionTime = System.nanoTime() - start;
-//        }
+                }
+                for (var entry : localCell2Parents.entrySet()) {
+                    cell2Parents.merge(entry.getKey(), entry.getValue(), (a, b) -> {
+                        a.addAll(b);
+                        return a;
+                    });
+                }
+                treeLevels.addFirst(currLevel);
+                currLevel = nextLevel;
+                nextLevel = new HashSet<>();
+            }
+
+            modelConstructionTime = System.nanoTime() - start;
+        }
     }
 }
