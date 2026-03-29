@@ -8,7 +8,6 @@ import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.exceptions.Neo4jException;
 
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -100,27 +99,22 @@ public class Instantiator {
     public void iterateRules(Cell start, long sourceInsertionTime, ArrayList<HyperEdge> result, HashMap<Property, ArrayList<Rule>> connectedRules)
             throws Neo4jException {
         for (var rule : connectedRules.getOrDefault(start.property, EMPTY_LIST)) {
-            queryRule(rule, start, sourceInsertionTime);
-//            try (queryRule(rule, start, sourceInsertionTime)) {
-//                result.addAll(resultSetToCellList(rule, start, rs, sourceInsertionTime));
-//            }
+            ArrayList<Record> rs = queryRule(rule, start, sourceInsertionTime);
+            resultSetToCellList(rule, start, rs, sourceInsertionTime);
         }
     }
 
-    public void queryRule(Rule rule, Cell identifier, long sourceInsertionTime) throws Neo4jException {
+    public ArrayList<Record> queryRule(Rule rule, Cell identifier, long sourceInsertionTime) throws Neo4jException {
         ArrayList<String> matchStrings = new ArrayList<>();
         ArrayList<String> whereStrings = new ArrayList<>();
         ArrayList<String> returnStrings = new ArrayList<>();
-        // MATCH (p1:Profile) , (p1)-[:INSERTED_AT]->(p1_it), (p1 {profid:4001})
-        //WHERE p1_it.mostusedhashtag >= 1643870651000 OR p1_it.avgreplies >= 1643870651000
-        //RETURN p1.profid,p1.mostusedhashtag,p1_it.mostusedhashtag,p1.avgreplies,p1_it.avgreplies
-
 
         String id = identifier.key;
         String identifierNode = identifier.property.node;
+        String nodeAlias = rule.node2Alias.get(identifierNode);
         String nodeKey = nodeName2keyProp.get(identifierNode);
-        String idMatchCondition = "(" + identifierNode + "{" + nodeKey + ":" + id + "})";
-        String whereIdCondition = identifierNode + "." + nodeKey;
+        String idMatchCondition = "(" + nodeAlias + ":" + identifierNode + " {" + nodeKey + ":" + id + "})";
+        String whereIdCondition = nodeAlias + "." + nodeKey;
 
         matchStrings.add(idMatchCondition);
         returnStrings.add(whereIdCondition);
@@ -157,13 +151,25 @@ public class Instantiator {
                 "WHERE " + String.join(" OR ", whereStrings) + " " +
                 "RETURN " + String.join(", ", returnStrings) + ";";
 
-        // Return statement
+        try (Session session = driver.session(sessionConfig)) {
+            return session.executeRead(tx -> {
+                Result rs = tx.run(finalQuery);
+
+                ArrayList<Record> list = new ArrayList<>();
+
+                while (rs.hasNext()) {
+                    list.add(rs.next());
+                }
+
+                return list;
+            });
+        }
     }
 
-//    // TODO:Needs Completion
-//    public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ResultSet resultSet, long sourceInsertionTime) throws Neo4jException {
-//        var result = new ArrayList<HyperEdge>();
-//        while (resultSet.next()) { // For each element in the result
+    // TODO:Needs Completion
+    public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ArrayList<Record> records, long sourceInsertionTime) throws Neo4jException {
+        var result = new ArrayList<HyperEdge>();
+        for (Record record : records) {
 //            HashMap<String, String> table2Key = new HashMap<>(rule.nodes.size(), 1f);
 //            int columnIdx = 1;
 //            for (int tableIdx = 0; tableIdx < rule.nodes.size(); tableIdx++) {
@@ -200,7 +206,7 @@ public class Instantiator {
 //                    result.add(list);
 //                }
 //            }
-//        }
-//        return result;
-//    }
+        }
+        return null;
+    }
 }
