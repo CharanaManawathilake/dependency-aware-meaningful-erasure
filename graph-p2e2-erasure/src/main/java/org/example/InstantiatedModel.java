@@ -54,35 +54,34 @@ public class InstantiatedModel {
                 for (var curr : currLevel) {
                     var instantiationStart = System.nanoTime();
                     var result = instantiator.instantiateAttachedCells(curr, deleted.insertionTime);
-//                    instantiationTime.put(curr, System.nanoTime() - instantiationStart);
+                    instantiationTime.put(curr, System.nanoTime() - instantiationStart);
 //
-//                    for (var edge : result) { //! results is an arraylist of hyperedges
-//                        if (!containsParent(edge, cell2Parents.get(curr))) { //! if the edge doesn't contain any parent
-//                            var cellIter = edge.iterator(); //! Creates an iterator over the set of cells
-//                            var newCells = new ArrayList<Cell>(edge.size()); //! Hold canonical representations
-//
-//                            while (cellIter.hasNext()) { //! Loop through the Cells in an edge
-//                                var cell = cellIter.next();
-//
-//                                var unifiedCell = cell2Identity.get(cell); //! Get the identity of the cell
-//                                if (unifiedCell == null) { //! if the cell doesn't exist already, put it to the hashmap
-//                                    cell2Identity.put(cell, cell);
-//                                    unifiedCell = cell;
-//                                } else {  //! if the cell already exists
-//                                    cellIter.remove(); //! Remove it from teh iterator (Edge)
-//                                    newCells.add(unifiedCell); //! Add it to the newCells arraylist
-//                                }
-//                                localCell2Parents.computeIfAbsent(unifiedCell, a -> new HashSet<>()).add(curr); //! add unifiedCell -> curr to the cap
-//
-//                                //! New unseen cells are added to the nextLevel to be visited the next iteration
-//                                if (instantiatedCells.add(unifiedCell)) { //! if absent add unifiedCell to the nextLevel
-//                                    nextLevel.add(unifiedCell);
-//                                }
-//                            }
-//                            edge.addAll(newCells); //! Add all the newCells cells(canonical cells) to the edge
-//                            cell2Edge.computeIfAbsent(curr, a -> new ArrayList<>()).add(edge); //! Add curr -> cell2Edge to the map
-//                        }
-//                    }
+                    for (var edge : result) {
+                        if (!containsParent(edge, cell2Parents.get(curr))) {
+                            var cellIter = edge.iterator();
+                            var newCells = new ArrayList<Cell>(edge.size());
+
+                            while (cellIter.hasNext()) {
+                                var cell = cellIter.next();
+
+                                var unifiedCell = cell2Identity.get(cell);
+                                if (unifiedCell == null) {
+                                    cell2Identity.put(cell, cell);
+                                    unifiedCell = cell;
+                                } else {
+                                    cellIter.remove();
+                                    newCells.add(unifiedCell);
+                                }
+                                localCell2Parents.computeIfAbsent(unifiedCell, a -> new HashSet<>()).add(curr);
+
+                                if (instantiatedCells.add(unifiedCell)) {
+                                    nextLevel.add(unifiedCell);
+                                }
+                            }
+                            edge.addAll(newCells);
+                            cell2Edge.computeIfAbsent(curr, a -> new ArrayList<>()).add(edge);
+                        }
+                    }
                 }
                 for (var entry : localCell2Parents.entrySet()) {
                     cell2Parents.merge(entry.getKey(), entry.getValue(), (a, b) -> {

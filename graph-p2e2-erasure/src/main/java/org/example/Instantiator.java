@@ -8,8 +8,11 @@ import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.exceptions.Neo4jException;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class Instantiator {
     final public HashMap<Property, ArrayList<Rule>> propertyInHead;
@@ -100,7 +103,7 @@ public class Instantiator {
             throws Neo4jException {
         for (var rule : connectedRules.getOrDefault(start.property, EMPTY_LIST)) {
             ArrayList<Record> rs = queryRule(rule, start, sourceInsertionTime);
-            resultSetToCellList(rule, start, rs, sourceInsertionTime);
+            result.addAll(resultSetToCellList(rule, start, rs, sourceInsertionTime));
         }
     }
 
@@ -114,7 +117,6 @@ public class Instantiator {
         String nodeAlias = rule.node2Alias.get(identifierNode);
         String nodeKey = nodeName2keyProp.get(identifierNode);
         String idMatchCondition = "(" + nodeAlias + ":" + identifierNode + " {" + nodeKey + ":" + id + "})";
-        String whereIdCondition = nodeAlias + "." + nodeKey;
 
         matchStrings.add(idMatchCondition);
         matchStrings.add(rule.condition);
@@ -167,7 +169,6 @@ public class Instantiator {
         }
     }
 
-    // TODO:Needs Completion
     public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ArrayList<Record> records, long sourceInsertionTime) throws Neo4jException {
         var result = new ArrayList<HyperEdge>();
         for (Record record : records) {
@@ -179,34 +180,78 @@ public class Instantiator {
 
             if (rule.head.equals(start.property)) {
                 columnIdx += 2;
-//                var list = new HyperEdge(rule.tail.size());
-//                boolean anyNull = false;
-//                for (int tailIdx = 0; tailIdx < rule.tail.size(); tailIdx++) {
-//                    var currAttr = rule.tail.get(tailIdx);
-//                    var val = resultSet.getString(columnIdx++);
-//                    var it = resultSet.getLong(columnIdx++);
-//                    if (val == null) {
-//                        anyNull = true;
-//                        break;
-//                    }
-//                    if (it >= sourceInsertionTime) {
-//                        list.add(new Cell(currAttr, table2Key.get(currAttr.node), val));
-//                    }
-//                }
-//                if (!anyNull && !list.isEmpty()) {
-//                    result.add(list);
-//                }
+                var list = new HyperEdge(rule.tail.size());
+                boolean anyNull = false;
+                for (int tailIdx = 0; tailIdx < rule.tail.size(); tailIdx++) {
+                    var currProp = rule.tail.get(tailIdx);
+                    String val = record.get(columnIdx++).toString();
+                    long it = record.get(columnIdx++).asLong();
+                    if (val == null) {
+                        anyNull = true;
+                        break;
+                    }
+                    if (it >= sourceInsertionTime) {
+                        list.add(new Cell(currProp, node2Key.get(currProp.node), val));
+                    }
+                }
+                if (!anyNull && !list.isEmpty()) {
+                    result.add(list);
+                }
             } else {
-//                // if start is in tail, only the head is interesting to us
-//                var val = resultSet.getString(columnIdx++);
-//                var it = resultSet.getLong(columnIdx);
-//                if (val != null && it >= sourceInsertionTime) {
-//                    var list = new HyperEdge(1);
-//                    list.add(new Cell(rule.head, table2Key.get(rule.head.node), val));
-//                    result.add(list);
-//                }
+                String val = record.get(columnIdx++).toString();
+                long it = record.get(columnIdx).asLong();
+                if (val != null && it >= sourceInsertionTime) {
+                    var list = new HyperEdge(1);
+                    list.add(new Cell(rule.head, node2Key.get(rule.head.node), val));
+                    result.add(list);
+                }
             }
         }
-        return null;
+        return result;
+    }
+
+    public long deleteCells(HashSet<Cell> toDelete) throws Neo4jException {
+        var delStart = System.nanoTime();
+        for (var cell : toDelete) {
+            setToNull(cell);
+        }
+        return System.nanoTime() - delStart;
+    }
+
+    private void setToNull(Cell cell) throws Neo4jException {
+        // TODO: Write queries to nullify each cell
+    }
+
+    public void resetValues(Collection<Cell> cells) throws SQLException {
+        // TODO: Code to update the cell
+
+//        for (var cell : cells) {
+//            var stmt = c.prepareStatement("UPDATE " + cell.attribute.table + " SET " + cell.attribute.attribute + " = ? WHERE " + tableName2keyCol.get(cell.attribute.table) + " = '" + cell.key + "'");
+//            if (cell.attribute.attribute.equals("payload")) {
+//                PGobject jsonObject = new PGobject();
+//                jsonObject.setType("json");
+//                jsonObject.setValue(cell.value);
+//                stmt.setObject(1, jsonObject);
+//            } else {
+//                try {
+//                    var val = Long.parseLong(cell.value);
+//                    stmt.setLong(1, val);
+//                } catch (Exception e) {
+//                    try {
+//                        var val = Float.parseFloat(cell.value);
+//                        stmt.setFloat(1, val);
+//                    } catch (Exception e2) {
+//                        stmt.setString(1, cell.value);
+//                    }
+//                }
+//
+//            }
+//            var i = stmt.executeUpdate();
+//            stmt.close();
+//            if (i != 1) {
+//                throw new SQLException("More cells deleted than expected");
+//            }
+//        }
+//        c.commit();
     }
 }
