@@ -117,8 +117,12 @@ public class Instantiator {
         String whereIdCondition = nodeAlias + "." + nodeKey;
 
         matchStrings.add(idMatchCondition);
-        returnStrings.add(whereIdCondition);
         matchStrings.add(rule.condition);
+
+        for (int i = 0; i < rule.nodes.size(); i++){
+            String node = rule.nodes.get(i);
+            returnStrings.add(rule.node2Alias.get(node) + "." + nodeName2keyProp.get(node));
+        }
 
         for (String node : rule.nodes) {
             String alias = rule.node2Alias.get(node);
@@ -141,7 +145,7 @@ public class Instantiator {
             String tailAlias_it = tailAlias  + "_it";
             String tailProp = tail.property;
 
-            whereStrings.add(tailAlias + "." + tailProp + ">=" + it);
+            whereStrings.add(tailAlias_it + "." + tailProp + ">=" + it);
             returnStrings.add(tailAlias + "." + tailProp);
             returnStrings.add(tailAlias_it + "." + tailProp);
         }
@@ -154,13 +158,10 @@ public class Instantiator {
         try (Session session = driver.session(sessionConfig)) {
             return session.executeRead(tx -> {
                 Result rs = tx.run(finalQuery);
-
                 ArrayList<Record> list = new ArrayList<>();
-
                 while (rs.hasNext()) {
                     list.add(rs.next());
                 }
-
                 return list;
             });
         }
@@ -170,15 +171,14 @@ public class Instantiator {
     public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ArrayList<Record> records, long sourceInsertionTime) throws Neo4jException {
         var result = new ArrayList<HyperEdge>();
         for (Record record : records) {
-//            HashMap<String, String> table2Key = new HashMap<>(rule.nodes.size(), 1f);
-//            int columnIdx = 1;
-//            for (int tableIdx = 0; tableIdx < rule.nodes.size(); tableIdx++) {
-//                table2Key.put(rule.nodes.get(tableIdx), resultSet.getString(columnIdx++));
-//            }
-//
-//            if (rule.head.equals(start.property)) {
-//                // if start == head, then all other cells need to be connected
-//                columnIdx += 2;
+            HashMap<String, String> node2Key = new HashMap<>();
+            int columnIdx = 0;
+            for (int nodeIdx = 0; nodeIdx < rule.nodes.size(); nodeIdx++) {
+                node2Key.put(rule.nodes.get(nodeIdx), record.get(columnIdx++).toString());
+            }
+
+            if (rule.head.equals(start.property)) {
+                columnIdx += 2;
 //                var list = new HyperEdge(rule.tail.size());
 //                boolean anyNull = false;
 //                for (int tailIdx = 0; tailIdx < rule.tail.size(); tailIdx++) {
@@ -196,7 +196,7 @@ public class Instantiator {
 //                if (!anyNull && !list.isEmpty()) {
 //                    result.add(list);
 //                }
-//            } else {
+            } else {
 //                // if start is in tail, only the head is interesting to us
 //                var val = resultSet.getString(columnIdx++);
 //                var it = resultSet.getLong(columnIdx);
@@ -205,7 +205,7 @@ public class Instantiator {
 //                    list.add(new Cell(rule.head, table2Key.get(rule.head.node), val));
 //                    result.add(list);
 //                }
-//            }
+            }
         }
         return null;
     }
