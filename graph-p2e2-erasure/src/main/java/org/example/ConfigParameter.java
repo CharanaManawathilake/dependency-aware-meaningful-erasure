@@ -7,11 +7,11 @@ public class ConfigParameter {
     static String schemaFile = "schema_" + dataset + ".csv";
     static String derivedFile = "derived_" + dataset + ".csv";
 
-    public static String connectionUrl = "jdbc:neo4j://127.0.0.1:7687"; // Note final slash
+    public static String connectionUrl = "neo4j://127.0.0.1:7687"; // Note final slash
     public static String database = "p2e2";
     public static String username = "neo4j";
     public static String password = "password";
-    static int numKeys = 10;
+    static int numKeys = 1;
     static boolean batching = false;
     static boolean scheduling = false;
     static boolean averageDependence = false;
@@ -21,6 +21,8 @@ public class ConfigParameter {
     static long startSchedule = 1;
     static long endSchedule = 2;
     static long baseFrequency = 1000;
+
+    static String insertionTimeRelationship = "INSERTED_AT";
 
 
     public static void setDataset(String dataset) {
