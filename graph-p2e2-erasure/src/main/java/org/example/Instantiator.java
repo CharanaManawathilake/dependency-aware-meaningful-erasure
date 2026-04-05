@@ -234,7 +234,7 @@ public class Instantiator {
             session.executeWrite(tx -> {
                 Result rs = tx.run(query);
                 ResultSummary summary = rs.consume();
-                if (summary.counters().propertiesSet() != 1) {
+                if (summary.counters().propertiesSet() > 1) {
                     throw new Neo4jException("Given id is not unique");
                 }
                 return null;

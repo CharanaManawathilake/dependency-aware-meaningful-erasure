@@ -258,8 +258,8 @@ public class Main {
                      Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
                      instantiator.resetValues(deletionSets[1]);
                  }
-                 writeOutput();
              }
+            writeOutput();
         }
     }
 

@@ -1,8 +1,8 @@
 package org.example;
 
 import org.example.GraphDependencyRules.Cell;
+import org.neo4j.driver.exceptions.Neo4jException;
 
-import java.sql.SQLException;
 import java.util.*;
 
 public class InstantiatedModel {
@@ -21,11 +21,11 @@ public class InstantiatedModel {
         return false;
     }
 
-    public InstantiatedModel(Cell deleted, Instantiator instantiator) throws SQLException {
+    public InstantiatedModel(Cell deleted, Instantiator instantiator) throws Neo4jException {
         this(List.of(deleted), instantiator);
     }
 
-    public InstantiatedModel(List<Cell> deletedCells, Instantiator instantiator) throws SQLException {
+    public InstantiatedModel(List<Cell> deletedCells, Instantiator instantiator) throws Neo4jException {
         var start = System.nanoTime();
         HashMap<Cell, Cell> cell2Identity = new HashMap<>();
         var instantiatedCells = new HashSet<Cell>();
