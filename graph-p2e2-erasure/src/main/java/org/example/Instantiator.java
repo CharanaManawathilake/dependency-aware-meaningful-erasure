@@ -7,6 +7,7 @@ import org.example.GraphDependencyRules.Rule;
 import org.neo4j.driver.*;
 import org.neo4j.driver.Record;
 import org.neo4j.driver.exceptions.Neo4jException;
+import org.neo4j.driver.summary.ResultSummary;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -121,7 +122,7 @@ public class Instantiator {
         matchStrings.add(idMatchCondition);
         matchStrings.add(rule.condition);
 
-        for (int i = 0; i < rule.nodes.size(); i++){
+        for (int i = 0; i < rule.nodes.size(); i++) {
             String node = rule.nodes.get(i);
             returnStrings.add(rule.node2Alias.get(node) + "." + nodeName2keyProp.get(node));
         }
@@ -142,9 +143,9 @@ public class Instantiator {
         returnStrings.add(headAlias + "." + headProp);
         returnStrings.add(headAlias_it + "." + headProp);
 
-        for (Property tail : rule.tail){
+        for (Property tail : rule.tail) {
             String tailAlias = rule.node2Alias.get(tail.node);
-            String tailAlias_it = tailAlias  + "_it";
+            String tailAlias_it = tailAlias + "_it";
             String tailProp = tail.property;
 
             whereStrings.add(tailAlias_it + "." + tailProp + ">=" + it);
@@ -154,8 +155,8 @@ public class Instantiator {
 
         String finalQuery =
                 "MATCH " + String.join(", ", matchStrings) + " " +
-                "WHERE " + String.join(" OR ", whereStrings) + " " +
-                "RETURN " + String.join(", ", returnStrings) + ";";
+                        "WHERE " + String.join(" OR ", whereStrings) + " " +
+                        "RETURN " + String.join(", ", returnStrings) + ";";
 
         try (Session session = driver.session(sessionConfig)) {
             return session.executeRead(tx -> {
@@ -219,7 +220,26 @@ public class Instantiator {
     }
 
     private void setToNull(Cell cell) throws Neo4jException {
-        // TODO: Write queries to nullify each cell
+        String node = cell.property.node;
+        String prop = cell.property.property;
+        String keyProp = nodeName2keyProp.get(node);
+        String key = cell.key;
+
+        String query = String.format(
+                "MATCH (a:%s {%s: %s}) REMOVE a.%s",
+                node, keyProp, key, prop
+        );
+
+        try (Session session = driver.session(sessionConfig)) {
+            session.executeWrite(tx -> {
+                Result rs = tx.run(query);
+                ResultSummary summary = rs.consume();
+                if (summary.counters().propertiesSet() != 1) {
+                    throw new Neo4jException("Given id is not unique");
+                }
+                return null;
+            });
+        }
     }
 
     public void resetValues(Collection<Cell> cells) throws SQLException {

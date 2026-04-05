@@ -258,7 +258,7 @@ public class Main {
                      Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
                      instantiator.resetValues(deletionSets[1]);
                  }
-//            writeOutput();
+                 writeOutput();
              }
         }
     }
@@ -545,5 +545,42 @@ public class Main {
     private static void writeHeader() {
         // TODO:Add suitable values
         System.out.println("Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
+    }
+
+    private static void writeOutput() {
+        ArrayList<String> output = new ArrayList<>();
+        // subtract instantiation time from model construction
+        Utils.optimalTimes[2] -= Utils.optimalTimes[1];
+        // no model construction for approximate version
+        Utils.ilpTimes[2] -= Utils.ilpTimes[1];
+        for (var time : Utils.optimalTimes) {
+            output.add(getTimeString(time));
+        }
+        for (var time : Utils.approximateTimes) {
+            output.add(getTimeString(time));
+        }
+        for (var time : Utils.ilpTimes) {
+            output.add(getTimeString(time));
+        }
+        for (var count : Utils.optimalCounts) {
+            output.add(String.valueOf(count));
+        }
+        for (var count : Utils.approximateCounts) {
+            output.add(String.valueOf(count));
+        }
+        for (var count : Utils.ilpCounts) {
+            output.add(String.valueOf(count));
+        }
+        System.out.println(String.join(",", output));
+        Arrays.fill(Utils.optimalTimes, 0L);
+        Arrays.fill(Utils.approximateTimes, 0L);
+        Arrays.fill(Utils.ilpTimes, 0L);
+        Arrays.fill(Utils.optimalCounts, 0L);
+        Arrays.fill(Utils.approximateCounts, 0L);
+        Arrays.fill(Utils.ilpCounts, 0L);
+    }
+
+    private static String getTimeString(long time) {
+        return String.valueOf((long) (time / 1e6));
     }
 }
