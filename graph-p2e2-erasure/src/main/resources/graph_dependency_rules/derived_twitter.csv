@@ -1,4 +1,0 @@
-MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totallikes,p2.likes
-MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalquotes,p2.quotes
-MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalreplies,p2.replies
-MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalretweets,p2.retweets
