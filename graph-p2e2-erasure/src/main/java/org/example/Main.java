@@ -249,9 +249,12 @@ public class Main {
 
                  assert deletionSets[0].size() == deletionSets[2].size();
                  var deletionTime = instantiator.deleteCells(deletionSets[2]);
+
                  instantiator.resetValues(deletionSets[2]);
+
                  Utils.optimalTimes[4] += deletionTime;
                  Utils.ilpTimes[4] += deletionTime;
+
                  if (deletionSets[0].size() == deletionSets[1].size()) {
                      Utils.approximateTimes[4] += deletionTime;
                  } else {

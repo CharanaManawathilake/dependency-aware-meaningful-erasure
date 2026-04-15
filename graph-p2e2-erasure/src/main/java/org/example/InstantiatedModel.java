@@ -55,7 +55,7 @@ public class InstantiatedModel {
                     var instantiationStart = System.nanoTime();
                     var result = instantiator.instantiateAttachedCells(curr, deleted.insertionTime);
                     instantiationTime.put(curr, System.nanoTime() - instantiationStart);
-//
+
                     for (var edge : result) {
                         if (!containsParent(edge, cell2Parents.get(curr))) {
                             var cellIter = edge.iterator();

@@ -242,36 +242,53 @@ public class Instantiator {
         }
     }
 
-    public void resetValues(Collection<Cell> cells) throws SQLException {
-        // TODO: Code to update the cell
+    public void resetValues(Collection<Cell> cells) throws Neo4jException {
+        try (Session session = driver.session(sessionConfig)) {
+            session.executeWrite(tx -> {
 
-//        for (var cell : cells) {
-//            var stmt = c.prepareStatement("UPDATE " + cell.attribute.table + " SET " + cell.attribute.attribute + " = ? WHERE " + tableName2keyCol.get(cell.attribute.table) + " = '" + cell.key + "'");
-//            if (cell.attribute.attribute.equals("payload")) {
-//                PGobject jsonObject = new PGobject();
-//                jsonObject.setType("json");
-//                jsonObject.setValue(cell.value);
-//                stmt.setObject(1, jsonObject);
-//            } else {
-//                try {
-//                    var val = Long.parseLong(cell.value);
-//                    stmt.setLong(1, val);
-//                } catch (Exception e) {
-//                    try {
-//                        var val = Float.parseFloat(cell.value);
-//                        stmt.setFloat(1, val);
-//                    } catch (Exception e2) {
-//                        stmt.setString(1, cell.value);
-//                    }
-//                }
-//
-//            }
-//            var i = stmt.executeUpdate();
-//            stmt.close();
-//            if (i != 1) {
-//                throw new SQLException("More cells deleted than expected");
-//            }
-//        }
-//        c.commit();
+                for (var cell : cells) {
+
+                    String node = cell.property.node;
+                    String property = cell.property.property;
+                    String keyColumn = nodeName2keyProp.get(cell.property.node);
+
+                    String cypher =
+                            "MATCH (n:" + node + " {" + keyColumn + ": $key}) " +
+                                    "SET n." + property + " = $value";
+
+                    Object value;
+
+                    if (property.equals("payload")) {
+                        value = cell.value; // JSON stored as string or pre-parsed map
+                    } else {
+                        try {
+                            value = Long.parseLong(cell.value);
+                        } catch (Exception e) {
+                            try {
+                                value = Float.parseFloat(cell.value);
+                            } catch (Exception e2) {
+                                value = cell.value;
+                            }
+                        }
+                    }
+
+                    Result rs = tx.run(
+                            cypher,
+                            org.neo4j.driver.Values.parameters(
+                                    "key", cell.key,
+                                    "value", value
+                            )
+                    );
+
+                    ResultSummary summary = rs.consume();
+
+                    if (summary.counters().propertiesSet() != 1) {
+                        throw new Neo4jException("Unexpected number of updates");
+                    }
+                }
+
+                return null;
+            });
+        }
     }
 }
