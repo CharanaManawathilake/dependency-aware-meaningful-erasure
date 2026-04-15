@@ -250,16 +250,12 @@ public class Instantiator {
 
                     String node = cell.property.node;
                     String property = cell.property.property;
-                    String keyColumn = nodeName2keyProp.get(cell.property.node);
-
-                    String cypher =
-                            "MATCH (n:" + node + " {" + keyColumn + ": $key}) " +
-                                    "SET n." + property + " = $value";
+                    String keyColumn = nodeName2keyProp.get(node);
 
                     Object value;
 
                     if (property.equals("payload")) {
-                        value = cell.value; // JSON stored as string or pre-parsed map
+                        value = cell.value;
                     } else {
                         try {
                             value = Long.parseLong(cell.value);
@@ -272,14 +268,28 @@ public class Instantiator {
                         }
                     }
 
-                    Result rs = tx.run(
-                            cypher,
-                            org.neo4j.driver.Values.parameters(
-                                    "key", cell.key,
-                                    "value", value
-                            )
-                    );
+                    String keyValue;
 
+                    try {
+                        Long.parseLong(cell.key);
+                        keyValue = cell.key;
+                    } catch (Exception e) {
+                        keyValue = "'" + cell.key.replace("'", "\\'") + "'";
+                    }
+
+                    String formattedValue;
+
+                    if (value instanceof String) {
+                        formattedValue = "'" + ((String) value).replace("'", "\\'") + "'";
+                    } else {
+                        formattedValue = value.toString();
+                    }
+
+                    String cypher =
+                            "MATCH (n:" + node + " {" + keyColumn + ": " + keyValue + "}) " +
+                                    "SET n." + property + " = " + formattedValue;
+
+                    Result rs = tx.run(cypher);
                     ResultSummary summary = rs.consume();
 
                     if (summary.counters().propertiesSet() != 1) {
