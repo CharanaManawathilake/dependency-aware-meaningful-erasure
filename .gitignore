@@ -27,4 +27,11 @@ replay_pid*
 twitter-dataset/*.csv
 
 # intellij
+.idea/
+.env
 
+# IDE files
+**/.idea/
+
+# Maven wrapper / IDE metadata
+**/.mvn/
