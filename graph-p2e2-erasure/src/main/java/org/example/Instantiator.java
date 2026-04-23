@@ -75,11 +75,19 @@ public class Instantiator {
         try (Session session = driver.session(sessionConfig)) {
             session.executeRead(tx -> {
                 String cypher = String.format(
-                        "MATCH (a:%s {%s:%s})-[:%s]->(b) RETURN a.%s AS aProp, b.%s AS bProp",
-                        node, keyProp, key, IT_RELATION, prop, prop
+                        // parameterized the query ($id) to use Neo4j query caches
+                        "MATCH (a:%s {%s:$id})-[:%s]->(b) RETURN a.%s AS aProp, b.%s AS bProp",
+                        node, keyProp, IT_RELATION, prop, prop
                 );
 
-                Result result = tx.run(cypher);
+                // parsing id to long if possible, otherwise to string and defining the parameter value
+                Object parsedId;
+                try {
+                    parsedId = Long.parseLong(key);
+                } catch (NumberFormatException e) {
+                    parsedId = key.replace("\"", "");
+                }
+                Result result = tx.run(cypher, Values.parameters("id", parsedId));
                 if (result.hasNext()) {
                     Record record = result.next();
                     cell.value = record.get("aProp").toString();
@@ -117,7 +125,8 @@ public class Instantiator {
         String identifierNode = identifier.property.node;
         String nodeAlias = rule.node2Alias.get(identifierNode);
         String nodeKey = nodeName2keyProp.get(identifierNode);
-        String idMatchCondition = "(" + nodeAlias + ":" + identifierNode + " {" + nodeKey + ":" + id + "})";
+        // moving from String Concatenation to Parameterized Queries
+        String idMatchCondition = "(" + nodeAlias + ":" + identifierNode + " {" + nodeKey + ": $id})";
 
         matchStrings.add(idMatchCondition);
         matchStrings.add(rule.condition);
@@ -134,12 +143,11 @@ public class Instantiator {
             matchStrings.add(matchCondition);
         }
 
-        String it = Long.toString(identifier.insertionTime);
         String headAlias = rule.node2Alias.get(rule.head.node);
         String headAlias_it = headAlias + "_it";
         String headProp = rule.head.property;
 
-        whereStrings.add(headAlias_it + "." + headProp + ">=" + it);
+        whereStrings.add(headAlias_it + "." + headProp + " >= $it");
         returnStrings.add(headAlias + "." + headProp);
         returnStrings.add(headAlias_it + "." + headProp);
 
@@ -148,7 +156,7 @@ public class Instantiator {
             String tailAlias_it = tailAlias + "_it";
             String tailProp = tail.property;
 
-            whereStrings.add(tailAlias_it + "." + tailProp + ">=" + it);
+            whereStrings.add(tailAlias_it + "." + tailProp + " >= $it");
             returnStrings.add(tailAlias + "." + tailProp);
             returnStrings.add(tailAlias_it + "." + tailProp);
         }
@@ -160,7 +168,13 @@ public class Instantiator {
 
         try (Session session = driver.session(sessionConfig)) {
             return session.executeRead(tx -> {
-                Result rs = tx.run(finalQuery);
+                Object parsedId;
+                try {
+                    parsedId = Long.parseLong(id);
+                } catch (NumberFormatException e) {
+                    parsedId = id.replace("\"", "");
+                }
+                Result rs = tx.run(finalQuery, Values.parameters("id", parsedId, "it", identifier.insertionTime));
                 ArrayList<Record> list = new ArrayList<>();
                 while (rs.hasNext()) {
                     list.add(rs.next());
@@ -226,13 +240,19 @@ public class Instantiator {
         String key = cell.key;
 
         String query = String.format(
-                "MATCH (a:%s {%s: %s}) REMOVE a.%s",
-                node, keyProp, key, prop
+                "MATCH (a:%s {%s: $id}) REMOVE a.%s",
+                node, keyProp, prop
         );
 
         try (Session session = driver.session(sessionConfig)) {
             session.executeWrite(tx -> {
-                Result rs = tx.run(query);
+                Object parsedId;
+                try {
+                    parsedId = Long.parseLong(key);
+                } catch (NumberFormatException e) {
+                    parsedId = key.replace("\"", "");
+                }
+                Result rs = tx.run(query, Values.parameters("id", parsedId));
                 ResultSummary summary = rs.consume();
                 if (summary.counters().propertiesSet() > 1) {
                     throw new Neo4jException("Given id is not unique");
