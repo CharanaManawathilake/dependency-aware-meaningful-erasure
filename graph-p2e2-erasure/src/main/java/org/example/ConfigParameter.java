@@ -1,5 +1,8 @@
 package org.example;
 
+import java.util.Arrays;
+import java.util.HashSet;
+
 public class ConfigParameter {
     static String dataset = "twitter";
     static String configPath = "src/main/resources/graph_dependency_rules";
@@ -7,6 +10,7 @@ public class ConfigParameter {
     static String schemaFile = "schema_" + dataset + ".csv";
     static String derivedFile = "derived_" + dataset + ".csv";
 
+    static HashSet<String> algorithms = new HashSet<>(Arrays.asList("optimal", "approximate", "ilp", "greedy"));
     public static String connectionUrl = "neo4j://127.0.0.1:7687"; // Note final slash
     public static String database = "p2e2";
     public static String username = "neo4j";

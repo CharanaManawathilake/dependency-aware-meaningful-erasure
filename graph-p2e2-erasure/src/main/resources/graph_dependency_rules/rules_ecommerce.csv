@@ -1,0 +1,6 @@
+MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.totalsales,p2.quantity
+MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.avgrating,p2.rating
+MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.stockvalue,p2.price
+MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.totalrevenue,p1.totalsales
+MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.avgproductrating,p1.avgrating
+MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.totalorders,p1.totalsales

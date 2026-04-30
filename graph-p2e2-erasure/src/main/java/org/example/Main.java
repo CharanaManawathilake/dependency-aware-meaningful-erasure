@@ -34,7 +34,6 @@ public class Main {
         env.set(GRB.IntParam.LogToConsole, 0);
 
         for (JSONObject caseConfig : cases) {
-            // reset global state
             rules.clear();
             derivedData.clear();
             derivedProperties.clear();
@@ -54,7 +53,7 @@ public class Main {
 
             checkNonCyclicRules(baseProperties);
 
-        var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
+            var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
 
         // Choose execution mode based on scheduling flag
         if (ConfigParameter.scheduling) {
@@ -62,11 +61,11 @@ public class Main {
             executeRetentionDrivenDeletion(instantiator, baseProperties);
         } else {
             System.out.println("=== USER-INITIATED DELETION ===");
-            iterateProperties(instantiator, baseProperties);
+                iterateProperties(instantiator, baseProperties);
         }
         
-        instantiator.close();
-        }
+                instantiator.close();
+            }
         env.dispose();
     }
 
@@ -139,6 +138,15 @@ public class Main {
         }
         if (root.has("insertionTimeRelationship")) {
             ConfigParameter.insertionTimeRelationship = root.getString("insertionTimeRelationship");
+        }
+        if (root.has("algorithms")) {
+            var arr = root.getJSONArray("algorithms");
+            ConfigParameter.algorithms = new HashSet<>();
+            for (int i = 0; i < arr.length(); i++) {
+                ConfigParameter.algorithms.add(arr.getString(i).toLowerCase());
+            }
+        } else {
+            ConfigParameter.algorithms = new HashSet<>(Arrays.asList("optimal", "approximate", "ilp", "greedy"));
         }
     }
 
@@ -368,8 +376,7 @@ public class Main {
 
     private static void iterateProperties(Instantiator instantiator, Set<Property> properties) throws Exception {
         writeHeader();
-        @SuppressWarnings("unchecked")
-        HashSet<Cell>[] deletionSets = new HashSet[3];
+        HashSet<Cell>[] deletionSets = new HashSet[4];
 
         for (var prop : properties){
             System.out.print(prop.toString() + ",");
@@ -379,21 +386,45 @@ public class Main {
                  var deletionPropVal = new Cell(prop, key);
                  instantiator.completePropVal(deletionPropVal);
                  InstantiatedModel instantiatedModel = new InstantiatedModel(deletionPropVal, instantiator);
-                 deletionSets[0] = runDeletionMethod(deletionPropVal, instantiatedModel, 0, Utils.optimalCounts);
-                 deletionSets[1] = runDeletionMethod(deletionPropVal, instantiatedModel, 1, Utils.approximateCounts);
-                 deletionSets[2] = runDeletionMethod(deletionPropVal, instantiatedModel, 2, Utils.ilpCounts);
-                 deletionSets[3] = runDeletionMethod(deletionPropVal, instantiatedModel, 3, Utils.greedyCounts);
+                 var algos = ConfigParameter.algorithms;
 
-                 assert deletionSets[0].size() == deletionSets[2].size();
-                 var deletionTime = instantiator.deleteCells(deletionSets[2]);
-                 instantiator.resetValues(deletionSets[2]);
-                 Utils.optimalTimes[4] += deletionTime;
-                 Utils.ilpTimes[4] += deletionTime;
-                 if (deletionSets[0].size() == deletionSets[1].size()) {
-                     Utils.approximateTimes[4] += deletionTime;
-                 } else {
-                     Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
-                     instantiator.resetValues(deletionSets[1]);
+                 if (algos.contains("optimal"))
+                     deletionSets[0] = runDeletionMethod(deletionPropVal, instantiatedModel, 0, Utils.optimalCounts);
+                 if (algos.contains("approximate"))
+                     deletionSets[1] = runDeletionMethod(deletionPropVal, instantiatedModel, 1, Utils.approximateCounts);
+                 if (algos.contains("ilp"))
+                     deletionSets[2] = runDeletionMethod(deletionPropVal, instantiatedModel, 2, Utils.ilpCounts);
+                 if (algos.contains("greedy"))
+                     deletionSets[3] = runDeletionMethod(deletionPropVal, instantiatedModel, 3, Utils.greedyCounts);
+
+                 HashSet<Cell> referenceSet = deletionSets[2] != null ? deletionSets[2]
+                         : deletionSets[0] != null ? deletionSets[0]
+                         : deletionSets[3] != null ? deletionSets[3]
+                         : deletionSets[1];
+
+                 var deletionTime = instantiator.deleteCells(referenceSet);
+                 instantiator.resetValues(referenceSet);
+
+                 if (algos.contains("optimal")) {
+                     Utils.optimalTimes[4] += deletionSets[0].size() == referenceSet.size()
+                             ? deletionTime : instantiator.deleteCells(deletionSets[0]);
+                     if (deletionSets[0].size() != referenceSet.size())
+                         instantiator.resetValues(deletionSets[0]);
+                 }
+                 if (algos.contains("approximate")) {
+                     Utils.approximateTimes[4] += deletionSets[1].size() == referenceSet.size()
+                             ? deletionTime : instantiator.deleteCells(deletionSets[1]);
+                     if (deletionSets[1].size() != referenceSet.size())
+                         instantiator.resetValues(deletionSets[1]);
+                 }
+                 if (algos.contains("ilp")) {
+                     Utils.ilpTimes[4] += deletionTime;
+                 }
+                 if (algos.contains("greedy")) {
+                     Utils.greedyTimes[4] += deletionSets[3].size() == referenceSet.size()
+                             ? deletionTime : instantiator.deleteCells(deletionSets[3]);
+                     if (deletionSets[3].size() != referenceSet.size())
+                         instantiator.resetValues(deletionSets[3]);
                  }
                  if (deletionSets[0].size() == deletionSets[3].size()) {
                      Utils.greedyTimes[4] += deletionTime;
@@ -773,41 +804,71 @@ public class Main {
 
     private static void writeHeader() {
         System.out.println("Dataset,Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,greedyTime,greedyInstantiationTime,greedyModelTime,greedyOptimizationTime,greedyDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory,greedyDeletes,greedyInstantiations,greedyHeight,greedyMemory");
+        var algos = ConfigParameter.algorithms;
+        ArrayList<String> headers = new ArrayList<>();
+        headers.add("Dataset");
+        headers.add("Attribute");
+
+        if (algos.contains("optimal")) {
+            headers.addAll(Arrays.asList(
+                    "optimalTime","optimalInstantiationTime","optimalModelTime",
+                    "optimalOptimizationTime","optimalDeletionTime",
+                    "optimalDeletes","optimalInstantiations","optimalHeight","optimalMemory"
+            ));
+        }
+        if (algos.contains("approximate")) {
+            headers.addAll(Arrays.asList(
+                    "approximateTime","approximateInstantiationTime","approximateModelTime",
+                    "approximateOptimizationTime","approximateDeletionTime",
+                    "approximateDeletes","approximateInstantiations","approximateHeight","approximateMemory"
+            ));
+        }
+        if (algos.contains("ilp")) {
+            headers.addAll(Arrays.asList(
+                    "ilpTime","ilpInstantiationTime","ilpModelTime",
+                    "ilpOptimizationTime","ilpDeletionTime",
+                    "ilpDeletes","ilpInstantiations","ilpHeight","ilpMemory"
+            ));
+        }
+        if (algos.contains("greedy")) {
+            headers.addAll(Arrays.asList(
+                    "greedyTime","greedyInstantiationTime","greedyModelTime",
+                    "greedyOptimizationTime","greedyDeletionTime",
+                    "greedyDeletes","greedyInstantiations","greedyHeight","greedyMemory"
+            ));
+        }
+        System.out.println(String.join(",", headers));
     }
 
     private static void writeOutput() {
+        var algos = ConfigParameter.algorithms;
         ArrayList<String> output = new ArrayList<>();
         output.add(ConfigParameter.ruleFile.replace("rules_", "").replace(".csv", ""));
-        // subtract instantiation time from model construction
-        Utils.optimalTimes[2] -= Utils.optimalTimes[1];
-        // no model construction for approximate version
-        Utils.ilpTimes[2] -= Utils.ilpTimes[1];
-        for (var time : Utils.optimalTimes) {
-            output.add(getTimeString(time));
+
+        // subtract instantiation from model time
+        if (algos.contains("optimal")) Utils.optimalTimes[2] -= Utils.optimalTimes[1];
+        if (algos.contains("ilp"))     Utils.ilpTimes[2]     -= Utils.ilpTimes[1];
+
+        if (algos.contains("optimal")) {
+            for (var t : Utils.optimalTimes)  output.add(getTimeString(t));
+            for (var c : Utils.optimalCounts) output.add(String.valueOf(c));
         }
-        for (var time : Utils.approximateTimes) {
-            output.add(getTimeString(time));
+        if (algos.contains("approximate")) {
+            for (var t : Utils.approximateTimes)  output.add(getTimeString(t));
+            for (var c : Utils.approximateCounts) output.add(String.valueOf(c));
         }
-        for (var time : Utils.ilpTimes) {
-            output.add(getTimeString(time));
+        if (algos.contains("ilp")) {
+            for (var t : Utils.ilpTimes)  output.add(getTimeString(t));
+            for (var c : Utils.ilpCounts) output.add(String.valueOf(c));
         }
-        for (var time : Utils.greedyTimes) {
-            output.add(getTimeString(time));
+        if (algos.contains("greedy")) {
+            for (var t : Utils.greedyTimes)  output.add(getTimeString(t));
+            for (var c : Utils.greedyCounts) output.add(String.valueOf(c));
         }
-        for (var count : Utils.optimalCounts) {
-            output.add(String.valueOf(count));
-        }
-        for (var count : Utils.approximateCounts) {
-            output.add(String.valueOf(count));
-        }
-        for (var count : Utils.ilpCounts) {
-            output.add(String.valueOf(count));
-        }
-        for (var count : Utils.greedyCounts) {
-            output.add(String.valueOf(count));
-        }
+
         System.out.println(String.join(",", output));
-        Arrays.fill(Utils.optimalTimes, 0L);
+
+        Arrays.fill(Utils.optimalTimes,     0L);
         Arrays.fill(Utils.approximateTimes, 0L);
         Arrays.fill(Utils.ilpTimes, 0L);
         Arrays.fill(Utils.optimalCounts, 0L);
