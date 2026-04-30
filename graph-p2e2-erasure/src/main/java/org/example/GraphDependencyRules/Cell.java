@@ -18,6 +18,7 @@ public class Cell implements Comparable<Cell> {
 
     public String value;
     public long insertionTime;
+    public long expiryTime;    // When this cell's data must be deleted (for retention-driven deletion)
     public long cost = Integer.MAX_VALUE;
 
     public Cell(Property property, String key) {
