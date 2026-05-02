@@ -48,6 +48,8 @@ public class Main {
 
         // TODO:Complete conditional access
         iterateProperties(instantiator, baseProperties);
+
+        System.out.println("Processing user...");
     }
 
     private static void parseConfigFile(String jsonString) throws Exception {

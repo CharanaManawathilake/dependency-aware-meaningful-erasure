@@ -25,15 +25,16 @@ public class Instantiator {
     public final Driver driver;
     public final SessionConfig sessionConfig;
 
-    public Instantiator(HashMap<Property, ArrayList<Rule>> propertyInHead, HashMap<Property, ArrayList<Rule>> propertyInTail, HashMap<String, String> nodeName2keyProp) throws Neo4jException {
+    public Instantiator(HashMap<Property, ArrayList<Rule>> propertyInHead,
+            HashMap<Property, ArrayList<Rule>> propertyInTail, HashMap<String, String> nodeName2keyProp)
+            throws Neo4jException {
         this.propertyInHead = propertyInHead;
         this.propertyInTail = propertyInTail;
         this.nodeName2keyProp = nodeName2keyProp;
 
         driver = GraphDatabase.driver(
                 ConfigParameter.connectionUrl,
-                AuthTokens.basic(ConfigParameter.username, ConfigParameter.password)
-        );
+                AuthTokens.basic(ConfigParameter.username, ConfigParameter.password));
 
         sessionConfig = SessionConfig.builder().withDatabase(ConfigParameter.database).build();
     }
@@ -53,8 +54,7 @@ public class Instantiator {
                 ArrayList<String> list = new ArrayList<>();
                 String cypher = String.format(
                         "MATCH (p:%s) RETURN p.%s AS key ORDER BY rand() LIMIT %d",
-                        prop.node, keyProperty, ConfigParameter.numKeys
-                );
+                        prop.node, keyProperty, ConfigParameter.numKeys);
 
                 Result result = tx.run(cypher);
                 while (result.hasNext()) {
@@ -76,11 +76,11 @@ public class Instantiator {
             session.executeRead(tx -> {
                 String cypher = String.format(
                         // parameterized the query ($id) to use Neo4j query caches
-                        "MATCH (a:%s {%s:$id})-[:%s]->(b) RETURN a.%s AS aProp, b.%s AS bProp",
-                        node, keyProp, IT_RELATION, prop, prop
-                );
+                        "MATCH (a:%s {%s:$id}) RETURN a.%s AS aProp, a.insertionTime AS bProp",
+                        node, keyProp, prop);
 
-                // parsing id to long if possible, otherwise to string and defining the parameter value
+                // parsing id to long if possible, otherwise to string and defining the
+                // parameter value
                 Object parsedId;
                 try {
                     parsedId = Long.parseLong(key);
@@ -108,7 +108,8 @@ public class Instantiator {
         return result;
     }
 
-    public void iterateRules(Cell start, long sourceInsertionTime, ArrayList<HyperEdge> result, HashMap<Property, ArrayList<Rule>> connectedRules)
+    public void iterateRules(Cell start, long sourceInsertionTime, ArrayList<HyperEdge> result,
+            HashMap<Property, ArrayList<Rule>> connectedRules)
             throws Neo4jException {
         for (var rule : connectedRules.getOrDefault(start.property, EMPTY_LIST)) {
             ArrayList<Record> rs = queryRule(rule, start, sourceInsertionTime);
@@ -136,35 +137,35 @@ public class Instantiator {
             returnStrings.add(rule.node2Alias.get(node) + "." + nodeName2keyProp.get(node));
         }
 
-        for (String node : rule.nodes) {
-            String alias = rule.node2Alias.get(node);
-            String alias_it = alias + "_it";
-            String matchCondition = "(" + alias + ")-[:" + IT_RELATION + "]->(" + alias_it + ")";
-            matchStrings.add(matchCondition);
-        }
+        /*
+         * Property Scope: This assumes that insertionTime applies globally to the node,
+         * meaning all properties on a Profile or Post share the same creation
+         * timestamp.
+         * 
+         * Index Creation: To get the full P2E2 advantage, you will need to add Neo4j
+         * B-Tree
+         * indexes on :Profile(insertionTime) and :Post(insertionTime).
+         */
 
         String headAlias = rule.node2Alias.get(rule.head.node);
-        String headAlias_it = headAlias + "_it";
         String headProp = rule.head.property;
 
-        whereStrings.add(headAlias_it + "." + headProp + " >= $it");
+        whereStrings.add(headAlias + ".insertionTime >= $it");
         returnStrings.add(headAlias + "." + headProp);
-        returnStrings.add(headAlias_it + "." + headProp);
+        returnStrings.add(headAlias + ".insertionTime");
 
         for (Property tail : rule.tail) {
             String tailAlias = rule.node2Alias.get(tail.node);
-            String tailAlias_it = tailAlias + "_it";
             String tailProp = tail.property;
 
-            whereStrings.add(tailAlias_it + "." + tailProp + " >= $it");
+            whereStrings.add(tailAlias + ".insertionTime >= $it");
             returnStrings.add(tailAlias + "." + tailProp);
-            returnStrings.add(tailAlias_it + "." + tailProp);
+            returnStrings.add(tailAlias + ".insertionTime");
         }
 
-        String finalQuery =
-                "MATCH " + String.join(", ", matchStrings) + " " +
-                        "WHERE " + String.join(" OR ", whereStrings) + " " +
-                        "RETURN " + String.join(", ", returnStrings) + ";";
+        String finalQuery = "MATCH " + String.join(", ", matchStrings) + " " +
+                "WHERE " + String.join(" OR ", whereStrings) + " " +
+                "RETURN " + String.join(", ", returnStrings) + ";";
 
         try (Session session = driver.session(sessionConfig)) {
             return session.executeRead(tx -> {
@@ -184,7 +185,8 @@ public class Instantiator {
         }
     }
 
-    public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ArrayList<Record> records, long sourceInsertionTime) throws Neo4jException {
+    public ArrayList<HyperEdge> resultSetToCellList(Rule rule, Cell start, ArrayList<Record> records,
+            long sourceInsertionTime) throws Neo4jException {
         var result = new ArrayList<HyperEdge>();
         for (Record record : records) {
             HashMap<String, String> node2Key = new HashMap<>();
@@ -241,8 +243,7 @@ public class Instantiator {
 
         String query = String.format(
                 "MATCH (a:%s {%s: $id}) REMOVE a.%s",
-                node, keyProp, prop
-        );
+                node, keyProp, prop);
 
         try (Session session = driver.session(sessionConfig)) {
             session.executeWrite(tx -> {
@@ -265,33 +266,35 @@ public class Instantiator {
     public void resetValues(Collection<Cell> cells) throws SQLException {
         // TODO: Code to update the cell
 
-//        for (var cell : cells) {
-//            var stmt = c.prepareStatement("UPDATE " + cell.attribute.table + " SET " + cell.attribute.attribute + " = ? WHERE " + tableName2keyCol.get(cell.attribute.table) + " = '" + cell.key + "'");
-//            if (cell.attribute.attribute.equals("payload")) {
-//                PGobject jsonObject = new PGobject();
-//                jsonObject.setType("json");
-//                jsonObject.setValue(cell.value);
-//                stmt.setObject(1, jsonObject);
-//            } else {
-//                try {
-//                    var val = Long.parseLong(cell.value);
-//                    stmt.setLong(1, val);
-//                } catch (Exception e) {
-//                    try {
-//                        var val = Float.parseFloat(cell.value);
-//                        stmt.setFloat(1, val);
-//                    } catch (Exception e2) {
-//                        stmt.setString(1, cell.value);
-//                    }
-//                }
-//
-//            }
-//            var i = stmt.executeUpdate();
-//            stmt.close();
-//            if (i != 1) {
-//                throw new SQLException("More cells deleted than expected");
-//            }
-//        }
-//        c.commit();
+        // for (var cell : cells) {
+        // var stmt = c.prepareStatement("UPDATE " + cell.attribute.table + " SET " +
+        // cell.attribute.attribute + " = ? WHERE " +
+        // tableName2keyCol.get(cell.attribute.table) + " = '" + cell.key + "'");
+        // if (cell.attribute.attribute.equals("payload")) {
+        // PGobject jsonObject = new PGobject();
+        // jsonObject.setType("json");
+        // jsonObject.setValue(cell.value);
+        // stmt.setObject(1, jsonObject);
+        // } else {
+        // try {
+        // var val = Long.parseLong(cell.value);
+        // stmt.setLong(1, val);
+        // } catch (Exception e) {
+        // try {
+        // var val = Float.parseFloat(cell.value);
+        // stmt.setFloat(1, val);
+        // } catch (Exception e2) {
+        // stmt.setString(1, cell.value);
+        // }
+        // }
+        //
+        // }
+        // var i = stmt.executeUpdate();
+        // stmt.close();
+        // if (i != 1) {
+        // throw new SQLException("More cells deleted than expected");
+        // }
+        // }
+        // c.commit();
     }
 }

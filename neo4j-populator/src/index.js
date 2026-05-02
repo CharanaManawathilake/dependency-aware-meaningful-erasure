@@ -10,7 +10,7 @@ async function ingestCSV(filePath, query, batchSize = 10000) {
         console.warn(`File not found, skipping: ${filePath}`);
         return;
     }
-    
+
     return new Promise((resolve, reject) => {
         let batch = [];
         let totalProcessed = 0;
@@ -24,7 +24,7 @@ async function ingestCSV(filePath, query, batchSize = 10000) {
                 batch = [];
                 try {
                     const session = driver.session({ database: process.env.NEO4J_DATABASE || 'p2e2' });
-                    await session.executeWrite(tx => 
+                    await session.executeWrite(tx =>
                         tx.run(query, { batch: currentBatch })
                     );
                     await session.close();
@@ -42,7 +42,7 @@ async function ingestCSV(filePath, query, batchSize = 10000) {
             if (batch.length > 0) {
                 try {
                     const session = driver.session({ database: process.env.NEO4J_DATABASE || 'p2e2' });
-                    await session.executeWrite(tx => 
+                    await session.executeWrite(tx =>
                         tx.run(query, { batch })
                     );
                     await session.close();
@@ -65,15 +65,15 @@ async function populateDatabase() {
         console.log('Connected to Neo4j. Starting population...');
 
         await createDatabase();
-        
+
         await clearDatabase();
         console.log('Database cleared successfully.');
-        
+
         await setup();
         console.log('Database constraints initialized.');
-        
+
         const datasetDir = path.join(__dirname, '../../twitter-dataset');
-        
+
         const profilePath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_profile.csv' : 'profile.csv');
         const postsPath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_posts.csv' : 'posts.csv');
         const profileInsertionPath = path.join(datasetDir, USE_SAMPLES ? 'samples/sample_profile_insertiontime.csv' : 'profile_insertiontime.csv');
@@ -116,38 +116,35 @@ async function populateDatabase() {
 
         const profileInsertionQuery = `
             UNWIND $batch AS row
-            MERGE (i:ProfileInsertion {insertionkey: row.insertionkey})
-            SET i.profpic = row.profpic,
-                i.avglikes = toInteger(row.avglikes),
-                i.totallikes = toInteger(row.totallikes),
-                i.avgreplies = toInteger(row.avgreplies),
-                i.totalreplies = toInteger(row.totalreplies),
-                i.avgretweets = toInteger(row.avgretweets),
-                i.totalretweets = toInteger(row.totalretweets),
-                i.avgquotes = toInteger(row.avgquotes),
-                i.totalquotes = toInteger(row.totalquotes),
-                i.mostusedhashtag = row.mostusedhashtag,
-                i.mostusedhashtagcount = toInteger(row.mostusedhashtagcount),
-                i.pscore = toInteger(row.pscore),
-                i.timestamp = toInteger(row.timestamp)
             MERGE (p:Profile {profid: row.insertionkey})
-            MERGE (p)-[:INSERTED_AT]->(i)
+            SET p.profpic = row.profpic,
+                p.avglikes = toInteger(row.avglikes),
+                p.totallikes = toInteger(row.totallikes),
+                p.avgreplies = toInteger(row.avgreplies),
+                p.totalreplies = toInteger(row.totalreplies),
+                p.avgretweets = toInteger(row.avgretweets),
+                p.totalretweets = toInteger(row.totalretweets),
+                p.avgquotes = toInteger(row.avgquotes),
+                p.totalquotes = toInteger(row.totalquotes),
+                p.mostusedhashtag = row.mostusedhashtag,
+                p.mostusedhashtagcount = toInteger(row.mostusedhashtagcount),
+                p.pscore = toInteger(row.pscore),
+                p.insertionTime = toInteger(row.timestamp)
         `;
         console.log('--- Ingesting Profile Insertion Events ---');
         await ingestCSV(profileInsertionPath, profileInsertionQuery);
 
         const postsInsertionQuery = `
             UNWIND $batch AS row
-            MERGE (i:PostInsertion {insertionkey: row.insertionkey})
-            SET i.username = toInteger(row.username),
-                i.postdata = toInteger(row.postdata),
-                i.likes = toInteger(row.likes),
-                i.retweets = toInteger(row.retweets),
-                i.quotes = toInteger(row.quotes),
-                i.replies = toInteger(row.replies),
-                i.timeposted = toInteger(row.timeposted)
             MERGE (post:Post {tweetid: row.insertionkey})
-            MERGE (post)-[:INSERTED_AT]->(i)
+            SET post.username = row.username,
+                post.postdata = row.postdata,
+                post.likes = toInteger(row.likes),
+                post.retweets = toInteger(row.retweets),
+                post.quotes = toInteger(row.quotes),
+                post.replies = toInteger(row.replies),
+                post.timeposted = row.timeposted,
+                post.insertionTime = toInteger(row.timestamp)
         `;
         console.log('--- Ingesting Posts Insertion Events ---');
         await ingestCSV(postsInsertionPath, postsInsertionQuery);

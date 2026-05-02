@@ -4,7 +4,7 @@ require('dotenv').config();
 const uri = process.env.NEO4J_URI || 'neo4j://127.0.0.1:7687';
 const user = process.env.NEO4J_USERNAME || 'neo4j';
 const password = process.env.NEO4J_PASSWORD || 'password';
-const database = process.env.NEO4J_DATABASE || 'p2e2';
+const database = process.env.NEO4J_DATABASE || 'neo4j';
 
 const driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
 
@@ -48,15 +48,6 @@ async function setup() {
     FOR (u:Profile) REQUIRE u.profid IS UNIQUE
   `, {}, { database });
 
-  await driver.executeQuery(`
-    CREATE CONSTRAINT profile_insertion_key IF NOT EXISTS
-    FOR (i:ProfileInsertion) REQUIRE i.insertionkey IS UNIQUE
-  `, {}, { database });
-
-  await driver.executeQuery(`
-    CREATE CONSTRAINT post_insertion_key IF NOT EXISTS
-    FOR (i:PostInsertion) REQUIRE i.insertionkey IS UNIQUE
-  `, {}, { database });
 }
 
 module.exports = {
