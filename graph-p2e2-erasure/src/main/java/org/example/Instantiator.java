@@ -102,6 +102,33 @@ public class Instantiator {
     }
 
     public ArrayList<HyperEdge> instantiateAttachedCells(Cell start, long sourceInsertionTime) throws Neo4jException {
+        /*
+         * APOC PATH EXPANSION
+         * Why it was NOT implemented that way:
+         * APOC path expansion requires traversing explicit, physical relationships
+         * between nodes
+         * (e.g., `(Post)-[:POSTED_BY]->(Profile)`). However, the P2E2 engine evaluates
+         * a *virtual*
+         * dependency graph. The edges of this graph are not physical Neo4j
+         * relationships, but rather
+         * arbitrary Cypher rules (which include complex property matching and dynamic
+         * timestamp
+         * `>=` logic per property).
+         * 
+         * Native APOC functions cannot recursively evaluate dynamic, arbitrary Cypher
+         * `MATCH` rules
+         * at each hop. Pushing the BFS (Breadth-First Search) entirely into Neo4j would
+         * require
+         * writing a custom Neo4j Java Server Extension (Plugin) to compile your
+         * specific rule
+         * evaluation logic into a native TraversalDescription.
+         * 
+         * Instead, we maintain the Java-side BFS (in `InstantiatedModel.java`), but we
+         * optimize
+         * the Neo4j interaction by ensuring fully parameterized queries (completed) and
+         * batching
+         * deletions to prevent excessive network round-trips.
+         */
         var result = new ArrayList<HyperEdge>();
         iterateRules(start, sourceInsertionTime, result, propertyInHead);
         iterateRules(start, sourceInsertionTime, result, propertyInTail);
@@ -230,38 +257,65 @@ public class Instantiator {
 
     public long deleteCells(HashSet<Cell> toDelete) throws Neo4jException {
         var delStart = System.nanoTime();
+
+        /*
+         * BATCH DELETION OPTIMIZATION
+         * 
+         * Why this was done:
+         * Previously, `setToNull` was called in a loop, opening a new transaction and
+         * executing
+         * a separate Cypher `MATCH ... REMOVE` query for every single cell. If
+         * thousands of cells were
+         * marked for deletion, it caused thousands of network round-trips to Neo4j.
+         * 
+         * By grouping deletions by their Node Label and Property, we can pass an array
+         * of keys
+         * to Neo4j and use `UNWIND`. This executes all deletions for a specific
+         * property in a
+         * single transaction, drastically reducing execution time and network
+         * ping-ponging.
+         */
+        HashMap<String, HashMap<String, ArrayList<Object>>> batchedDeletions = new HashMap<>();
+
         for (var cell : toDelete) {
-            setToNull(cell);
+            String node = cell.property.node;
+            String prop = cell.property.property;
+
+            Object keyParam;
+            try {
+                keyParam = Long.parseLong(cell.key);
+            } catch (NumberFormatException e) {
+                keyParam = cell.key.replace("\"", "");
+            }
+
+            batchedDeletions.computeIfAbsent(node, k -> new HashMap<>())
+                    .computeIfAbsent(prop, k -> new ArrayList<>())
+                    .add(keyParam);
         }
-        return System.nanoTime() - delStart;
-    }
-
-    private void setToNull(Cell cell) throws Neo4jException {
-        String node = cell.property.node;
-        String prop = cell.property.property;
-        String keyProp = nodeName2keyProp.get(node);
-        String key = cell.key;
-
-        String query = String.format(
-                "MATCH (a:%s {%s: $id}) REMOVE a.%s",
-                node, keyProp, prop);
 
         try (Session session = driver.session(sessionConfig)) {
-            session.executeWrite(tx -> {
-                Object parsedId;
-                try {
-                    parsedId = Long.parseLong(key);
-                } catch (NumberFormatException e) {
-                    parsedId = key.replace("\"", "");
+            for (var nodeEntry : batchedDeletions.entrySet()) {
+                String node = nodeEntry.getKey();
+                String keyProp = nodeName2keyProp.get(node);
+
+                for (var propEntry : nodeEntry.getValue().entrySet()) {
+                    String prop = propEntry.getKey();
+                    ArrayList<Object> keys = propEntry.getValue();
+
+                    String query = String.format(
+                            "UNWIND $keys AS key " +
+                                    "MATCH (a:%s {%s: key}) REMOVE a.%s",
+                            node, keyProp, prop);
+
+                    session.executeWrite(tx -> {
+                        tx.run(query, Values.parameters("keys", keys));
+                        return null;
+                    });
                 }
-                Result rs = tx.run(query, Values.parameters("id", parsedId));
-                ResultSummary summary = rs.consume();
-                if (summary.counters().propertiesSet() > 1) {
-                    throw new Neo4jException("Given id is not unique");
-                }
-                return null;
-            });
+            }
         }
+
+        return System.nanoTime() - delStart;
     }
 
     public void resetValues(Collection<Cell> cells) throws SQLException {
