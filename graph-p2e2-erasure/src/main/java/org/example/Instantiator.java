@@ -83,7 +83,7 @@ public class Instantiator {
                 if (result.hasNext()) {
                     Record record = result.next();
                     cell.value = record.get("aProp").toString();
-                    cell.insertionTime = record.get("bProp").asLong();
+                    cell.insertionTime = safeAsLong(record.get("bProp"));
                 }
                 if (result.hasNext()) {
                     throw new Neo4jException("Non-unique key!");
@@ -186,7 +186,7 @@ public class Instantiator {
                 for (int tailIdx = 0; tailIdx < rule.tail.size(); tailIdx++) {
                     var currProp = rule.tail.get(tailIdx);
                     String val = record.get(columnIdx++).toString();
-                    long it = record.get(columnIdx++).asLong();
+                    long it = safeAsLong(record.get(columnIdx++));
                     if (val == null) {
                         anyNull = true;
                         break;
@@ -200,7 +200,7 @@ public class Instantiator {
                 }
             } else {
                 String val = record.get(columnIdx++).toString();
-                long it = record.get(columnIdx).asLong();
+                long it = safeAsLong(record.get(columnIdx++));
                 if (val != null && it >= sourceInsertionTime) {
                     var list = new HyperEdge(1);
                     list.add(new Cell(rule.head, node2Key.get(rule.head.node), val));
@@ -242,36 +242,31 @@ public class Instantiator {
         }
     }
 
-    public void resetValues(Collection<Cell> cells) throws SQLException {
-        // TODO: Code to update the cell
+    public void resetValues(Collection<Cell> cells) {
+        for (var cell : cells) {
+            String node = cell.property.node;
+            String prop = cell.property.property;
+            String keyProp = nodeName2keyProp.get(node);
+            String key = cell.key;
 
-//        for (var cell : cells) {
-//            var stmt = c.prepareStatement("UPDATE " + cell.attribute.table + " SET " + cell.attribute.attribute + " = ? WHERE " + tableName2keyCol.get(cell.attribute.table) + " = '" + cell.key + "'");
-//            if (cell.attribute.attribute.equals("payload")) {
-//                PGobject jsonObject = new PGobject();
-//                jsonObject.setType("json");
-//                jsonObject.setValue(cell.value);
-//                stmt.setObject(1, jsonObject);
-//            } else {
-//                try {
-//                    var val = Long.parseLong(cell.value);
-//                    stmt.setLong(1, val);
-//                } catch (Exception e) {
-//                    try {
-//                        var val = Float.parseFloat(cell.value);
-//                        stmt.setFloat(1, val);
-//                    } catch (Exception e2) {
-//                        stmt.setString(1, cell.value);
-//                    }
-//                }
-//
-//            }
-//            var i = stmt.executeUpdate();
-//            stmt.close();
-//            if (i != 1) {
-//                throw new SQLException("More cells deleted than expected");
-//            }
-//        }
-//        c.commit();
+            String query = String.format(
+                    "MATCH (a:%s {%s: %s}) SET a.%s = %s",
+                    node, keyProp, key, prop, cell.value
+            );
+
+            try (Session session = driver.session(sessionConfig)) {
+                session.executeWrite(tx -> {
+                    tx.run(query);
+                    return null;
+                });
+            }
+        }
+    }
+
+    private long safeAsLong(Value value) {
+        if (value.type().name().equals("STRING")) {
+            return Long.parseLong(value.asString());
+        }
+        return value.asLong();
     }
 }
