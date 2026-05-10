@@ -46,3 +46,15 @@ The script will automatically:
 2. Clear the existing nodes and relationships securely.
 3. Initialize the necessary schema constraints (e.g., uniqueness on `profid` and `tweetid`).
 4. Read your CSV files sequentially and stream batch constraints into Neo4j.
+
+
+
+For executing the Java Application,
+
+on intellij: (better use IDE specific buttons than command line execution)
+more actions -> Edit Configurations 
+    Set Main Class to: org.example.Main
+    Set Program Arguments to: config.json
+    Set working directory to: D:\Database Internals Project\Graph-P2E2-Erasure\dependency-aware-meaningful-erasure\graph-p2e2-erasure
+
+Then use the Run button.

@@ -1,3 +1,12 @@
 {
-  "configPath" : "<PATH>"
+  "connectionUrl": "neo4j://localhost:7687",
+  "database": "neo4j",
+  "username": "neo4j",
+  "password": "<your_password>",
+  "configPath": "<path_to_rules>",
+  "ruleFile": "rules.csv",
+  "schemaFile": "schema.csv",
+  "derivedFile": "derived.csv",
+  "numKeys": 100,
+  "insertionTimeRelationship": "INSERTED_AT"
 }

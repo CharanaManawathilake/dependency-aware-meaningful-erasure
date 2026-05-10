@@ -129,7 +129,7 @@ async function populateDatabase() {
                 p.mostusedhashtag = row.mostusedhashtag,
                 p.mostusedhashtagcount = toInteger(row.mostusedhashtagcount),
                 p.pscore = toInteger(row.pscore),
-                p.insertionTime = toInteger(row.timestamp)
+                p.insertionTime = toInteger(row.avglikes)
         `;
         console.log('--- Ingesting Profile Insertion Events ---');
         await ingestCSV(profileInsertionPath, profileInsertionQuery);
@@ -144,7 +144,7 @@ async function populateDatabase() {
                 post.quotes = toInteger(row.quotes),
                 post.replies = toInteger(row.replies),
                 post.timeposted = row.timeposted,
-                post.insertionTime = toInteger(row.timestamp)
+                post.insertionTime = toInteger(row.timeposted)
         `;
         console.log('--- Ingesting Posts Insertion Events ---');
         await ingestCSV(postsInsertionPath, postsInsertionQuery);

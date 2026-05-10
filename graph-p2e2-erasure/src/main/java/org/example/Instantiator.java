@@ -152,15 +152,16 @@ public class Instantiator {
 
         whereStrings.add(headAlias + ".insertionTime >= $it");
         returnStrings.add(headAlias + "." + headProp);
-        returnStrings.add(headAlias + ".insertionTime");
+        returnStrings.add(headAlias + ".insertionTime AS " + headAlias + "_head_it");
 
+        int tailIdx = 0;
         for (Property tail : rule.tail) {
             String tailAlias = rule.node2Alias.get(tail.node);
             String tailProp = tail.property;
 
             whereStrings.add(tailAlias + ".insertionTime >= $it");
             returnStrings.add(tailAlias + "." + tailProp);
-            returnStrings.add(tailAlias + ".insertionTime");
+            returnStrings.add(tailAlias + ".insertionTime AS " + tailAlias + "_tail_it_" + tailIdx++);
         }
 
         String finalQuery = "MATCH " + String.join(", ", matchStrings) + " " +

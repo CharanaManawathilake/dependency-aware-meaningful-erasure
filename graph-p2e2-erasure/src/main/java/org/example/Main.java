@@ -26,6 +26,7 @@ public class Main {
     static GRBEnv env;
 
     public static void main(String[] args) throws Exception {
+        System.out.println("Processing user...");
         String configFilePath = args.length > 0 ? args[0] : "config.json";
         parseConfigFile(Files.readString(Paths.get(configFilePath)));
 
@@ -119,7 +120,8 @@ public class Main {
     }
 
     private static void parseRules() throws Exception {
-        var parser = CSVFormat.DEFAULT.parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.ruleFile)));
+        var parser = CSVFormat.DEFAULT
+                .parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.ruleFile)));
         for (var record : parser) {
             var rule = parseRule(record);
             rules.add(rule);
@@ -173,14 +175,16 @@ public class Main {
     }
 
     private static void parseSchema() throws IOException {
-        var parser = CSVFormat.DEFAULT.parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.schemaFile)));
+        var parser = CSVFormat.DEFAULT
+                .parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.schemaFile)));
         for (var record : parser) {
             nodeName2keyCol.put(record.get(0), record.get(1));
         }
     }
 
     private static void parseDerivedData() throws Exception {
-        var parser = CSVFormat.DEFAULT.parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.derivedFile)));
+        var parser = CSVFormat.DEFAULT
+                .parse(Files.newBufferedReader(Paths.get(ConfigParameter.configPath, ConfigParameter.derivedFile)));
         for (var record : parser) {
             var rule = parseRule(record);
             derivedData.add(rule);
@@ -207,7 +211,8 @@ public class Main {
 
                 for (var rule : propertyInHead.getOrDefault(curr, new ArrayList<>(0))) {
                     for (var prop : rule.tail) {
-                        assert (prop2Parent.get(prop) == null || prop2Parent.get(curr).equals(prop)) || prop.equals(curr);
+                        assert (prop2Parent.get(prop) == null || prop2Parent.get(curr).equals(prop))
+                                || prop.equals(curr);
                         if (!prop.equals(curr)) {
                             prop2Parent.put(prop, curr);
                         }
@@ -237,35 +242,36 @@ public class Main {
         writeHeader();
         HashSet<Cell>[] deletionSets = new HashSet[3];
 
-        for (var prop : properties){
+        for (var prop : properties) {
             System.out.print(prop.toString() + ",");
 
             ArrayList<String> keys = instantiator.getKeys(prop);
-             for (String key : keys ){
-                 var deletionPropVal = new Cell(prop, key);
-                 instantiator.completePropVal(deletionPropVal);
-                 InstantiatedModel instantiatedModel = new InstantiatedModel(deletionPropVal, instantiator);
-                 deletionSets[0] = runDeletionMethod(deletionPropVal, instantiatedModel, 0, Utils.optimalCounts);
-                 deletionSets[1] = runDeletionMethod(deletionPropVal, instantiatedModel, 1, Utils.approximateCounts);
-                 deletionSets[2] = runDeletionMethod(deletionPropVal, instantiatedModel, 2, Utils.ilpCounts);
+            for (String key : keys) {
+                var deletionPropVal = new Cell(prop, key);
+                instantiator.completePropVal(deletionPropVal);
+                InstantiatedModel instantiatedModel = new InstantiatedModel(deletionPropVal, instantiator);
+                deletionSets[0] = runDeletionMethod(deletionPropVal, instantiatedModel, 0, Utils.optimalCounts);
+                deletionSets[1] = runDeletionMethod(deletionPropVal, instantiatedModel, 1, Utils.approximateCounts);
+                deletionSets[2] = runDeletionMethod(deletionPropVal, instantiatedModel, 2, Utils.ilpCounts);
 
-                 assert deletionSets[0].size() == deletionSets[2].size();
-                 var deletionTime = instantiator.deleteCells(deletionSets[2]);
-                 instantiator.resetValues(deletionSets[2]);
-                 Utils.optimalTimes[4] += deletionTime;
-                 Utils.ilpTimes[4] += deletionTime;
-                 if (deletionSets[0].size() == deletionSets[1].size()) {
-                     Utils.approximateTimes[4] += deletionTime;
-                 } else {
-                     Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
-                     instantiator.resetValues(deletionSets[1]);
-                 }
-             }
+                assert deletionSets[0].size() == deletionSets[2].size();
+                var deletionTime = instantiator.deleteCells(deletionSets[2]);
+                instantiator.resetValues(deletionSets[2]);
+                Utils.optimalTimes[4] += deletionTime;
+                Utils.ilpTimes[4] += deletionTime;
+                if (deletionSets[0].size() == deletionSets[1].size()) {
+                    Utils.approximateTimes[4] += deletionTime;
+                } else {
+                    Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
+                    instantiator.resetValues(deletionSets[1]);
+                }
+            }
             writeOutput();
         }
     }
 
-    private static HashSet<Cell> runDeletionMethod(Cell deleted, InstantiatedModel instantiatedModel, int deletionMethod, long[] countsArray) throws Exception {
+    private static HashSet<Cell> runDeletionMethod(Cell deleted, InstantiatedModel instantiatedModel,
+            int deletionMethod, long[] countsArray) throws Exception {
         HashSet<Cell> result = null;
         switch (deletionMethod) {
             case 0:
@@ -343,12 +349,14 @@ public class Main {
         cellsToVisit.add(deleted);
         while (!cellsToVisit.isEmpty()) {
             var curr = cellsToVisit.poll();
-            // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes insertionTime, 1 byte state (deleted) and 4 bytes cost
+            // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes
+            // insertionTime, 1 byte state (deleted) and 4 bytes cost
             size += 4 + 4 + 4 + 1 + 4;
             var edges = model.cell2Edge.get(curr);
             if (edges != null) {
                 for (var edge : edges) {
-                    // 8 bytes per element in hyperedge + 8 bytes for pointer from head to edge + 4 bytes for the cheapest node
+                    // 8 bytes per element in hyperedge + 8 bytes for pointer from head to edge + 4
+                    // bytes for the cheapest node
                     size += edge.size() * 8L + 8L + 4L;
                     for (var cell : edge) {
                         if (instantiatedCells.add(cell)) {
@@ -387,7 +395,8 @@ public class Main {
                         for (var grandChildren : model.cell2Edge.getOrDefault(cell, EMPTY_LIST)) {
                             nodesInstantiated.addAll(grandChildren);
                         }
-                        if (minCell == null || model.cell2Edge.getOrDefault(cell, EMPTY_LIST).size() < model.cell2Edge.getOrDefault(minCell, EMPTY_LIST).size()) {
+                        if (minCell == null || model.cell2Edge.getOrDefault(cell, EMPTY_LIST).size() < model.cell2Edge
+                                .getOrDefault(minCell, EMPTY_LIST).size()) {
                             minCell = cell;
                             edge.minCell = cell;
                         }
@@ -404,7 +413,8 @@ public class Main {
         Utils.approximateCounts[1] += nodesInstantiated.size() - 1;
         int count = 0;
         for (var level : model.treeLevels) {
-            if (level.contains(lastCell)) break;
+            if (level.contains(lastCell))
+                break;
             count++;
         }
         Utils.approximateCounts[2] += model.treeLevels.size() - count;
@@ -418,10 +428,12 @@ public class Main {
         return toDelete;
     }
 
-    private static long measureApproximateMemory(InstantiatedModel model, HashSet<Cell> nodesInstantiated, HashSet<Cell> edgesInstantiated) {
+    private static long measureApproximateMemory(InstantiatedModel model, HashSet<Cell> nodesInstantiated,
+            HashSet<Cell> edgesInstantiated) {
         long size = 0;
 
-        // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes insertionTime, 1 byte state (deleted) and 4 bytes cost
+        // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes
+        // insertionTime, 1 byte state (deleted) and 4 bytes cost
         size += nodesInstantiated.size() * (4 + 4 + 4 + 1L);
 
         for (var cell : edgesInstantiated) {
@@ -526,12 +538,15 @@ public class Main {
         cellsToVisit.add(deleted);
         while (!cellsToVisit.isEmpty()) {
             var curr = cellsToVisit.poll();
-            // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes insertionTime, 1 byte decision variable aj, pointer for objective
+            // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes
+            // insertionTime, 1 byte decision variable aj, pointer for objective
             size += 4 + 4 + 4 + 1 + 8;
             var edges = model.cell2Edge.get(curr);
             if (edges != null) {
                 for (var edge : edges) {
-                    // 1 byte decision variable bi, 1 byte decision variable hij, constr aj = hij, constr bi = hij, 1byte decision variable + constr tji = aj + constr SUM(tji) >= bi per element in hyperedge
+                    // 1 byte decision variable bi, 1 byte decision variable hij, constr aj = hij,
+                    // constr bi = hij, 1byte decision variable + constr tji = aj + constr SUM(tji)
+                    // >= bi per element in hyperedge
                     size += 1L + 1L + 16L + 16L + edge.size() * (1L + 16L + 8L) + 8L;
                     for (var cell : edge) {
                         if (instantiatedCells.add(cell)) {
@@ -546,7 +561,8 @@ public class Main {
 
     private static void writeHeader() {
         // TODO:Add suitable values
-        System.out.println("Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
+        System.out.println(
+                "Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
     }
 
     private static void writeOutput() {
