@@ -27,27 +27,42 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         String configFilePath = args.length > 0 ? args[0] : "config.json";
-        parseConfigFile(Files.readString(Paths.get(configFilePath)));
+        List<JSONObject> cases = parseCases(Files.readString(Paths.get(configFilePath)));
 
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
         env.set(GRB.IntParam.LogToConsole, 0);
 
-        parseRules();
-        parseSchema();
-        parseDerivedData();
+        for (JSONObject caseConfig : cases) {
+            // reset global state
+            rules.clear();
+            derivedData.clear();
+            derivedProperties.clear();
+            propertyInHead.clear();
+            propertyInTail.clear();
+            nodeName2keyCol.clear();
 
-        var baseProperties = new HashSet<Property>();
-        baseProperties.addAll(propertyInTail.keySet());
-        baseProperties.addAll(propertyInHead.keySet());
-        baseProperties.removeAll(derivedProperties);
+            parseConfigFile(caseConfig.toString());
+            parseRules();
+            parseSchema();
+            parseDerivedData();
 
-        checkNonCyclicRules(baseProperties);
+            var baseProperties = new HashSet<Property>();
+            baseProperties.addAll(propertyInTail.keySet());
+            baseProperties.addAll(propertyInHead.keySet());
+            baseProperties.removeAll(derivedProperties);
 
-        var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
+            checkNonCyclicRules(baseProperties);
 
-        // TODO:Complete conditional access
-        iterateProperties(instantiator, baseProperties);
+            var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
+            try {
+                iterateProperties(instantiator, baseProperties);
+            } finally {
+                instantiator.close();
+            }
+        }
+
+        env.dispose();
     }
 
     private static void parseConfigFile(String jsonString) throws Exception {
@@ -126,6 +141,24 @@ public class Main {
                 propertyInTail.computeIfAbsent(tail, property -> new ArrayList<>()).add(rule);
             }
         }
+    }
+
+    private static List<JSONObject> parseCases(String jsonString) {
+        JSONObject root = new JSONObject(jsonString);
+        List<JSONObject> cases = new ArrayList<>();
+
+        if (root.has("cases")) {
+            var arr = root.getJSONArray("cases");
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject c = arr.getJSONObject(i);
+                if (c.optBoolean("enabled", true)) {
+                    cases.add(c);
+                }
+            }
+        } else {
+            cases.add(root);
+        }
+        return cases;
     }
 
     public static Rule parseRule(CSVRecord record) throws Exception {
@@ -543,12 +576,12 @@ public class Main {
     }
 
     private static void writeHeader() {
-        // TODO:Add suitable values
-        System.out.println("Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
+        System.out.println("Dataset,Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
     }
 
     private static void writeOutput() {
         ArrayList<String> output = new ArrayList<>();
+        output.add(ConfigParameter.ruleFile.replace("rules_", "").replace(".csv", ""));
         // subtract instantiation time from model construction
         Utils.optimalTimes[2] -= Utils.optimalTimes[1];
         // no model construction for approximate version

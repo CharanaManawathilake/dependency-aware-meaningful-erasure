@@ -1,3 +1,2 @@
-Supplier,supplierid
-Product,productid
-Order,orderid
+Profile,profid
+Post,tweetid

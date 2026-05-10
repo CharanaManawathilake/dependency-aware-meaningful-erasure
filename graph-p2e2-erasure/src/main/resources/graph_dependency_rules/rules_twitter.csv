@@ -1,6 +1,11 @@
-MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.totalsales,p2.quantity
-MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.avgrating,p2.rating
-MATCH,(p1:Product)-[:CONTAINS]->(p2:Order),RETURN,p1.stockvalue,p2.price
-MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.totalrevenue,p1.totalsales
-MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.avgproductrating,p1.avgrating
-MATCH,(s1:Supplier)-[:SUPPLIES]->(p1:Product),RETURN,s1.totalorders,p1.totalsales
+MATCH,(p1:Profile),RETURN,p1.avgquotes,p1.avgreplies
+MATCH,(p1:Profile),RETURN,p1.avgretweets,p1.totallikes
+MATCH,(p1:Profile),RETURN,p1.mostusedhashtagcount,p1.mostusedhashtag
+MATCH,(p1:Profile),RETURN,p1.mostusedhashtag,p1.avgreplies
+MATCH,(p1:Profile),RETURN,p1.pscore,p1.avgreplies,p1.avgretweets
+MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totallikes,p2.username,p2.likes
+MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalquotes,p2.username,p2.quotes
+MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalreplies,p2.username,p2.replies
+MATCH,(p1:Profile)-[:POSTED]->(p2:Post),RETURN,p1.totalretweets,p2.username,p2.retweets
+MATCH,(p1:Profile),RETURN,p1.pscore,p1.avglikes
+MATCH,(p2:Post),RETURN,p2.timeposted,p2.postdata
