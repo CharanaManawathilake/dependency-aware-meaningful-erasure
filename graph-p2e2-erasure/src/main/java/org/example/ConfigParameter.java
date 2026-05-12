@@ -25,6 +25,8 @@ public class ConfigParameter {
     static long startSchedule = 1;
     static long endSchedule = 2;
     static long baseFrequency = 1000;
+    static int schedulerBatchSize = 10;
+    static double overlapThreshold = 0.5;
 
     static String insertionTimeRelationship = "INSERTED_AT";
 

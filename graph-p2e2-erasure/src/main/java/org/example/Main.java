@@ -54,13 +54,18 @@ public class Main {
             checkNonCyclicRules(baseProperties);
 
             var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
-            try {
+
+        // Choose execution mode based on scheduling flag
+        if (ConfigParameter.scheduling) {
+            System.out.println("=== RETENTION-DRIVEN DELETION WITH SCHEDULER ===");
+            executeRetentionDrivenDeletion(instantiator, baseProperties);
+        } else {
+            System.out.println("=== USER-INITIATED DELETION ===");
                 iterateProperties(instantiator, baseProperties);
-            } finally {
+        }
+        
                 instantiator.close();
             }
-        }
-
         env.dispose();
     }
 
@@ -124,6 +129,12 @@ public class Main {
         }
         if (root.has("baseFrequency")) {
             ConfigParameter.baseFrequency = root.getLong("baseFrequency");
+        }
+        if (root.has("schedulerBatchSize")) {
+            ConfigParameter.schedulerBatchSize = root.getInt("schedulerBatchSize");
+        }
+        if (root.has("overlapThreshold")) {
+            ConfigParameter.overlapThreshold = root.getDouble("overlapThreshold");
         }
         if (root.has("insertionTimeRelationship")) {
             ConfigParameter.insertionTimeRelationship = root.getString("insertionTimeRelationship");
@@ -272,6 +283,97 @@ public class Main {
         }
     }
 
+    /**
+     * Algorithm 3: Retention-Driven Deletion with Reconstruction Scheduler
+     *
+     * Instead of deleting expired data immediately, the scheduler finds
+     * times where multiple expirations overlap and batches reconstructions.
+     *
+     * Example:
+     *   Data1 expires: 1:00 PM
+     *   Data2 expires: 1:30 PM
+     *   Data3 expires: 2:00 PM
+     *
+     * Without scheduler: 3 separate recomputations
+     * With scheduler: 1 batched recomputation at 1:30 PM (max overlap)
+     */
+    private static void executeRetentionDrivenDeletion(Instantiator instantiator, Set<Property> properties) throws Exception {
+        if (!ConfigParameter.scheduling) {
+            return;
+        }
+
+        ReconstructionScheduler scheduler = new ReconstructionScheduler();
+
+        // Step 1: Collect all retention intervals
+        System.out.println("Step 1: Collecting retention intervals for all cells...");
+        int totalCells = 0;
+
+        for (var prop : properties) {
+            ArrayList<String> keys = instantiator.getKeys(prop);
+            for (String key : keys) {
+                Cell cell = new Cell(prop, key);
+                instantiator.completePropVal(cell);
+
+                // Calculate retention window
+                long insertionTime = cell.insertionTime;
+                long retentionWindow = ConfigParameter.endSchedule - ConfigParameter.startSchedule;
+                long expiryTime = insertionTime + retentionWindow;
+
+                cell.expiryTime = expiryTime;
+                scheduler.addCell(cell, prop, insertionTime, expiryTime);
+                totalCells++;
+            }
+        }
+
+        System.out.println("Collected " + totalCells + " cells with retention intervals");
+
+        // Step 2: Generate optimal reconstruction schedule
+        System.out.println("\nStep 2: Generating reconstruction schedule...");
+        scheduler.generateSchedule();
+
+        // Step 3: Print schedule and savings
+        scheduler.printSchedule();
+        Map<String, Object> stats = scheduler.getStatistics();
+        System.out.println("Schedule statistics: " + stats);
+
+        // Step 4: Execute scheduled reconstructions
+        System.out.println("Step 3: Executing batched reconstructions...");
+        writeHeader();
+
+        int eventNumber = 0;
+        ReconstructionScheduler.ReconstructionEvent event;
+        while ((event = scheduler.getNextEvent()) != null) {
+            eventNumber++;
+            System.out.println("\n--- Reconstruction Event " + eventNumber + " ---");
+            System.out.println("Scheduled time: " + event.scheduledTime);
+            System.out.println("Processing " + event.cellsToProcess.size() + " cells:");
+
+            // Execute ILP deletion for all cells in this event
+            HashSet<Cell> totalCellsToDelete = new HashSet<>();
+
+            for (Cell cell : event.cellsToProcess) {
+                try {
+                    InstantiatedModel instantiatedModel = new InstantiatedModel(cell, instantiator);
+                    HashSet<Cell> toDelete = ilpApproach(instantiatedModel, cell);
+                    totalCellsToDelete.addAll(toDelete);
+                    System.out.println("  - Cell " + cell.key + ": delete " + toDelete.size() + " cells");
+                } catch (Exception e) {
+                    System.err.println("  ERROR processing cell " + cell.key + ": " + e.getMessage());
+                }
+            }
+
+            // Batch deletion
+            if (!totalCellsToDelete.isEmpty()) {
+                System.out.println("\nBatch deleting " + totalCellsToDelete.size() + " cells...");
+                var deletionTime = instantiator.deleteCells(totalCellsToDelete);
+                instantiator.resetValues(totalCellsToDelete);
+                System.out.println("Deletion completed in " + (deletionTime / 1e6) + " ms");
+            }
+        }
+
+        System.out.println("\n=== Retention-Driven Deletion Complete ===");
+    }
+
     private static void iterateProperties(Instantiator instantiator, Set<Property> properties) throws Exception {
         writeHeader();
         HashSet<Cell>[] deletionSets = new HashSet[4];
@@ -323,6 +425,12 @@ public class Main {
                              ? deletionTime : instantiator.deleteCells(deletionSets[3]);
                      if (deletionSets[3].size() != referenceSet.size())
                          instantiator.resetValues(deletionSets[3]);
+                 }
+                 if (deletionSets[0].size() == deletionSets[3].size()) {
+                     Utils.greedyTimes[4] += deletionTime;
+                 } else {
+                     Utils.greedyTimes[4] += instantiator.deleteCells(deletionSets[3]);
+                     instantiator.resetValues(deletionSets[3]);
                  }
              }
             writeOutput();
@@ -695,6 +803,7 @@ public class Main {
     }
 
     private static void writeHeader() {
+        System.out.println("Dataset,Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,greedyTime,greedyInstantiationTime,greedyModelTime,greedyOptimizationTime,greedyDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory,greedyDeletes,greedyInstantiations,greedyHeight,greedyMemory");
         var algos = ConfigParameter.algorithms;
         ArrayList<String> headers = new ArrayList<>();
         headers.add("Dataset");
@@ -761,12 +870,12 @@ public class Main {
 
         Arrays.fill(Utils.optimalTimes,     0L);
         Arrays.fill(Utils.approximateTimes, 0L);
-        Arrays.fill(Utils.ilpTimes,         0L);
-        Arrays.fill(Utils.greedyTimes,      0L);
-        Arrays.fill(Utils.optimalCounts,    0L);
-        Arrays.fill(Utils.approximateCounts,0L);
-        Arrays.fill(Utils.ilpCounts,        0L);
-        Arrays.fill(Utils.greedyCounts,     0L);
+        Arrays.fill(Utils.ilpTimes, 0L);
+        Arrays.fill(Utils.optimalCounts, 0L);
+        Arrays.fill(Utils.approximateCounts, 0L);
+        Arrays.fill(Utils.ilpCounts, 0L);
+        Arrays.fill(Utils.greedyTimes, 0L);
+        Arrays.fill(Utils.greedyCounts, 0L);
     }
 
     private static String getTimeString(long time) {
