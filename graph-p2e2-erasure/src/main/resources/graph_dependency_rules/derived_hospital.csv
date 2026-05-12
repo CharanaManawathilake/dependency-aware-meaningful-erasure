@@ -1,0 +1,17 @@
+MATCH,(p1:Patient)-[:HAD]->(p2:Appointment),RETURN,p1.totalappointments,p2.appointmentcount
+MATCH,(p1:Patient)-[:HAD]->(p2:Appointment),RETURN,p1.avgseverity,p2.severity
+MATCH,(p1:Patient)-[:HAD]->(p2:LabResult),RETURN,p1.avglabscore,p2.labscore
+MATCH,(p1:Patient)-[:HAD]->(p2:LabResult),RETURN,p1.riskscore,p2.labscore
+MATCH,(p1:Patient)-[:PRESCRIBED]->(p2:Medication),RETURN,p1.totalmedications,p2.medicationcount
+MATCH,(p1:Appointment)-[:INVOLVED]->(p2:Treatment),RETURN,p1.totalcost,p2.cost
+MATCH,(p1:Appointment)-[:INVOLVED]->(p2:Treatment),RETURN,p1.avgrecoverytime,p2.recoverytime
+MATCH,(p1:Treatment)-[:BILLED_TO]->(p2:Insurance),RETURN,p2.totalclaimed,p1.cost
+MATCH,(p1:Treatment)-[:BILLED_TO]->(p2:Insurance),RETURN,p2.approvalrate,p1.approvalstatus
+MATCH,(p1:Doctor)-[:PERFORMED]->(p2:Treatment),RETURN,p1.successrate,p2.outcome
+MATCH,(p1:Doctor)-[:PERFORMED]->(p2:Treatment),RETURN,p1.totaltreatments,p2.treatmentcount
+MATCH,(p1:Doctor)-[:WORKS_IN]->(p2:Department),RETURN,p2.avgdoctorrating,p1.rating
+MATCH,(p1:Hospital)-[:HAS]->(p2:Department),RETURN,p1.totalrevenue,p2.departmentrevenue
+MATCH,(p1:Hospital)-[:HAS]->(p2:Department),RETURN,p1.qualityrating,p2.avgdoctorrating
+MATCH,(p1:Department)-[:PERFORMED]->(p2:Treatment),RETURN,p1.departmentrevenue,p2.cost
+MATCH,(p1:Department)-[:PERFORMED]->(p2:Treatment),RETURN,p1.successrate,p2.outcome
+MATCH,(p1:Patient)-[:HAD]->(p2:Appointment),RETURN,p1.riskscore,p2.severity

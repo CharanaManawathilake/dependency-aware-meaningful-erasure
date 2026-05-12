@@ -1,0 +1,9 @@
+Patient,patientid
+Appointment,appointmentid
+Treatment,treatmentid
+Doctor,doctorid
+Hospital,hospitalid
+Insurance,insuranceid
+LabResult,labresultid
+Medication,medicationid
+Department,departmentid

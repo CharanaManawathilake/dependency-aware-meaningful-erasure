@@ -590,7 +590,6 @@ public class Main {
         Utils.greedyTimes[2] += model.modelConstructionTime;
         var start = System.nanoTime();
 
-        // build inverse index: cell -> all edges it appears in as a member
         HashMap<Cell, HashSet<Cell.HyperEdge>> cell2MemberEdges = new HashMap<>();
         for (var entry : model.cell2Edge.entrySet()) {
             for (var edge : entry.getValue()) {
@@ -602,7 +601,6 @@ public class Main {
             }
         }
 
-        // collect all edges that need to be hit
         HashSet<Cell.HyperEdge> uncoveredEdges = new HashSet<>();
         for (var edges : model.cell2Edge.values()) {
             uncoveredEdges.addAll(edges);
@@ -656,13 +654,10 @@ public class Main {
 
     private static long measureGreedyMemory(InstantiatedModel model, HashMap<Cell, HashSet<Cell.HyperEdge>> cell2MemberEdges) {
         long size = 0;
-        // per cell: same as optimal (4+4+4+1+4 bytes)
         size += cell2MemberEdges.size() * (4 + 4 + 4 + 1 + 4L);
-        // per edge reference in inverse index: 8 bytes pointer per entry
         for (var edges : cell2MemberEdges.values()) {
             size += edges.size() * 8L;
         }
-        // uncoveredEdges set: 8 bytes per edge pointer
         for (var edges : model.cell2Edge.values()) {
             size += edges.size() * 8L;
         }
@@ -676,12 +671,10 @@ public class Main {
         cellsToVisit.add(deleted);
         while (!cellsToVisit.isEmpty()) {
             var curr = cellsToVisit.poll();
-            // per cell: 4 bytes for the table index, 4 bytes for the row index, 4 bytes insertionTime, 1 byte decision variable aj, pointer for objective
             size += 4 + 4 + 4 + 1 + 8;
             var edges = model.cell2Edge.get(curr);
             if (edges != null) {
                 for (var edge : edges) {
-                    // 1 byte decision variable bi, 1 byte decision variable hij, constr aj = hij, constr bi = hij, 1byte decision variable + constr tji = aj + constr SUM(tji) >= bi per element in hyperedge
                     size += 1L + 1L + 16L + 16L + edge.size() * (1L + 16L + 8L) + 8L;
                     for (var cell : edge) {
                         if (instantiatedCells.add(cell)) {

@@ -2,9 +2,9 @@
   "name": "neo4j-populator",
   "version": "1.0.0",
   "description": "Script to create and populate Neo4j dataset",
-  "main": "src/index.js",
+  "main": "twitter_data_populator/index.js",
   "scripts": {
-    "db:populate": "node src/index.js"
+    "db:populate": "node twitter_data_populator/index.js"
   },
   "dependencies": {
     "csv-parser": "^3.2.0",
