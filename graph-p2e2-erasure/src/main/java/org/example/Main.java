@@ -27,22 +27,32 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         String configFilePath = args.length > 0 ? args[0] : "config.json";
-        parseConfigFile(Files.readString(Paths.get(configFilePath)));
+        List<JSONObject> cases = parseCases(Files.readString(Paths.get(configFilePath)));
 
         env = new GRBEnv();
         env.set(GRB.IntParam.OutputFlag, 0);
         env.set(GRB.IntParam.LogToConsole, 0);
 
-        parseRules();
-        parseSchema();
-        parseDerivedData();
+        for (JSONObject caseConfig : cases) {
+            // reset global state
+            rules.clear();
+            derivedData.clear();
+            derivedProperties.clear();
+            propertyInHead.clear();
+            propertyInTail.clear();
+            nodeName2keyCol.clear();
 
-        var baseProperties = new HashSet<Property>();
-        baseProperties.addAll(propertyInTail.keySet());
-        baseProperties.addAll(propertyInHead.keySet());
-        baseProperties.removeAll(derivedProperties);
+            parseConfigFile(caseConfig.toString());
+            parseRules();
+            parseSchema();
+            parseDerivedData();
 
-        checkNonCyclicRules(baseProperties);
+            var baseProperties = new HashSet<Property>();
+            baseProperties.addAll(propertyInTail.keySet());
+            baseProperties.addAll(propertyInHead.keySet());
+            baseProperties.removeAll(derivedProperties);
+
+            checkNonCyclicRules(baseProperties);
 
         var instantiator = new Instantiator(propertyInHead, propertyInTail, nodeName2keyCol);
 
@@ -56,6 +66,8 @@ public class Main {
         }
         
         instantiator.close();
+        }
+        env.dispose();
     }
 
     private static void parseConfigFile(String jsonString) throws Exception {
@@ -140,6 +152,24 @@ public class Main {
                 propertyInTail.computeIfAbsent(tail, property -> new ArrayList<>()).add(rule);
             }
         }
+    }
+
+    private static List<JSONObject> parseCases(String jsonString) {
+        JSONObject root = new JSONObject(jsonString);
+        List<JSONObject> cases = new ArrayList<>();
+
+        if (root.has("cases")) {
+            var arr = root.getJSONArray("cases");
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject c = arr.getJSONObject(i);
+                if (c.optBoolean("enabled", true)) {
+                    cases.add(c);
+                }
+            }
+        } else {
+            cases.add(root);
+        }
+        return cases;
     }
 
     public static Rule parseRule(CSVRecord record) throws Exception {
@@ -352,6 +382,7 @@ public class Main {
                  deletionSets[0] = runDeletionMethod(deletionPropVal, instantiatedModel, 0, Utils.optimalCounts);
                  deletionSets[1] = runDeletionMethod(deletionPropVal, instantiatedModel, 1, Utils.approximateCounts);
                  deletionSets[2] = runDeletionMethod(deletionPropVal, instantiatedModel, 2, Utils.ilpCounts);
+                 deletionSets[3] = runDeletionMethod(deletionPropVal, instantiatedModel, 3, Utils.greedyCounts);
 
                  assert deletionSets[0].size() == deletionSets[2].size();
                  var deletionTime = instantiator.deleteCells(deletionSets[2]);
@@ -363,6 +394,12 @@ public class Main {
                  } else {
                      Utils.approximateTimes[4] += instantiator.deleteCells(deletionSets[1]);
                      instantiator.resetValues(deletionSets[1]);
+                 }
+                 if (deletionSets[0].size() == deletionSets[3].size()) {
+                     Utils.greedyTimes[4] += deletionTime;
+                 } else {
+                     Utils.greedyTimes[4] += instantiator.deleteCells(deletionSets[3]);
+                     instantiator.resetValues(deletionSets[3]);
                  }
              }
             writeOutput();
@@ -380,6 +417,9 @@ public class Main {
                 break;
             case 2:
                 result = ilpApproach(instantiatedModel, deleted);
+                break;
+            case 3:
+                result = greedySetCoverDelete(instantiatedModel, deleted);
                 break;
         }
         countsArray[0] += result.size() - 1;
@@ -623,6 +663,89 @@ public class Main {
         return toDelete;
     }
 
+    private static HashSet<Cell> greedySetCoverDelete(InstantiatedModel model, Cell deleted) {
+        Utils.greedyTimes[2] += model.modelConstructionTime;
+        var start = System.nanoTime();
+
+        // build inverse index: cell -> all edges it appears in as a member
+        HashMap<Cell, HashSet<Cell.HyperEdge>> cell2MemberEdges = new HashMap<>();
+        for (var entry : model.cell2Edge.entrySet()) {
+            for (var edge : entry.getValue()) {
+                for (var cell : edge) {
+                    cell2MemberEdges
+                            .computeIfAbsent(cell, a -> new HashSet<>())
+                            .add(edge);
+                }
+            }
+        }
+
+        // collect all edges that need to be hit
+        HashSet<Cell.HyperEdge> uncoveredEdges = new HashSet<>();
+        for (var edges : model.cell2Edge.values()) {
+            uncoveredEdges.addAll(edges);
+        }
+
+        HashSet<Cell> toDelete = new HashSet<>();
+        toDelete.add(deleted);
+
+        // remove edges already covered by root cell
+        uncoveredEdges.removeAll(
+                cell2MemberEdges.getOrDefault(deleted, new HashSet<>())
+        );
+
+        // greedy loop
+        while (!uncoveredEdges.isEmpty()) {
+            Cell bestCell = null;
+            int bestCount = -1;
+
+            for (var entry : cell2MemberEdges.entrySet()) {
+                if (toDelete.contains(entry.getKey())) continue;
+
+                int count = 0;
+                for (var edge : entry.getValue()) {
+                    if (uncoveredEdges.contains(edge)) count++;
+                }
+
+                if (count > bestCount) {
+                    bestCount = count;
+                    bestCell = entry.getKey();
+                }
+            }
+
+            if (bestCell == null) break;
+
+            toDelete.add(bestCell);
+            uncoveredEdges.removeAll(
+                    cell2MemberEdges.getOrDefault(bestCell, new HashSet<>())
+            );
+        }
+
+        Utils.greedyTimes[3] += System.nanoTime() - start;
+        Utils.greedyCounts[1] += cell2MemberEdges.size();
+        Utils.greedyCounts[2] += model.treeLevels.size();
+
+        if (ConfigParameter.measureMemory) {
+            Utils.greedyCounts[3] += measureGreedyMemory(model, cell2MemberEdges);
+        }
+
+        return toDelete;
+    }
+
+    private static long measureGreedyMemory(InstantiatedModel model, HashMap<Cell, HashSet<Cell.HyperEdge>> cell2MemberEdges) {
+        long size = 0;
+        // per cell: same as optimal (4+4+4+1+4 bytes)
+        size += cell2MemberEdges.size() * (4 + 4 + 4 + 1 + 4L);
+        // per edge reference in inverse index: 8 bytes pointer per entry
+        for (var edges : cell2MemberEdges.values()) {
+            size += edges.size() * 8L;
+        }
+        // uncoveredEdges set: 8 bytes per edge pointer
+        for (var edges : model.cell2Edge.values()) {
+            size += edges.size() * 8L;
+        }
+        return size;
+    }
+
     private static long measureILPMemory(InstantiatedModel model, Cell deleted) {
         long size = 0;
         LinkedList<Cell> cellsToVisit = new LinkedList<>();
@@ -649,12 +772,12 @@ public class Main {
     }
 
     private static void writeHeader() {
-        // TODO:Add suitable values
-        System.out.println("Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory");
+        System.out.println("Dataset,Attribute,optimalTime,optimalInstantiationTime,optimalModelTime,optimalOptimizationTime,optimalDeletionTime,approximateTime,approximateInstantiationTime,approximateModelTime,approximateOptimizationTime,approximateDeletionTime,ilpTime,ilpInstantiationTime,ilpModelTime,ilpOptimizationTime,ilpDeletionTime,greedyTime,greedyInstantiationTime,greedyModelTime,greedyOptimizationTime,greedyDeletionTime,optimalDeletes,optimalInstantiations,optimalHeight,optimalMemory,approximateDeletes,approximateInstantiations,approximateHeight,approximateMemory,ilpDeletes,ilpInstantiations,ilpHeight,ilpMemory,greedyDeletes,greedyInstantiations,greedyHeight,greedyMemory");
     }
 
     private static void writeOutput() {
         ArrayList<String> output = new ArrayList<>();
+        output.add(ConfigParameter.ruleFile.replace("rules_", "").replace(".csv", ""));
         // subtract instantiation time from model construction
         Utils.optimalTimes[2] -= Utils.optimalTimes[1];
         // no model construction for approximate version
@@ -668,6 +791,9 @@ public class Main {
         for (var time : Utils.ilpTimes) {
             output.add(getTimeString(time));
         }
+        for (var time : Utils.greedyTimes) {
+            output.add(getTimeString(time));
+        }
         for (var count : Utils.optimalCounts) {
             output.add(String.valueOf(count));
         }
@@ -677,6 +803,9 @@ public class Main {
         for (var count : Utils.ilpCounts) {
             output.add(String.valueOf(count));
         }
+        for (var count : Utils.greedyCounts) {
+            output.add(String.valueOf(count));
+        }
         System.out.println(String.join(",", output));
         Arrays.fill(Utils.optimalTimes, 0L);
         Arrays.fill(Utils.approximateTimes, 0L);
@@ -684,6 +813,8 @@ public class Main {
         Arrays.fill(Utils.optimalCounts, 0L);
         Arrays.fill(Utils.approximateCounts, 0L);
         Arrays.fill(Utils.ilpCounts, 0L);
+        Arrays.fill(Utils.greedyTimes, 0L);
+        Arrays.fill(Utils.greedyCounts, 0L);
     }
 
     private static String getTimeString(long time) {
