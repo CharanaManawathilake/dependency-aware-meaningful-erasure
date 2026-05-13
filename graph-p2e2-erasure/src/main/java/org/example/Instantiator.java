@@ -83,7 +83,7 @@ public class Instantiator {
                 if (result.hasNext()) {
                     Record record = result.next();
                     cell.value = record.get("aProp").toString();
-                    cell.insertionTime = record.get("bProp").asLong();
+                    cell.insertionTime = safeAsLong(record.get("bProp"));
                 }
                 if (result.hasNext()) {
                     throw new Neo4jException("Non-unique key!");
@@ -186,7 +186,7 @@ public class Instantiator {
                 for (int tailIdx = 0; tailIdx < rule.tail.size(); tailIdx++) {
                     var currProp = rule.tail.get(tailIdx);
                     String val = record.get(columnIdx++).toString();
-                    long it = record.get(columnIdx++).asLong();
+                    long it = safeAsLong(record.get(columnIdx++));
                     if (val == null) {
                         anyNull = true;
                         break;
@@ -200,7 +200,7 @@ public class Instantiator {
                 }
             } else {
                 String val = record.get(columnIdx++).toString();
-                long it = record.get(columnIdx).asLong();
+                long it = safeAsLong(record.get(columnIdx++));
                 if (val != null && it >= sourceInsertionTime) {
                     var list = new HyperEdge(1);
                     list.add(new Cell(rule.head, node2Key.get(rule.head.node), val));
@@ -242,63 +242,31 @@ public class Instantiator {
         }
     }
 
-    public void resetValues(Collection<Cell> cells) throws Neo4jException {
-        try (Session session = driver.session(sessionConfig)) {
-            session.executeWrite(tx -> {
+    public void resetValues(Collection<Cell> cells) {
+        for (var cell : cells) {
+            String node = cell.property.node;
+            String prop = cell.property.property;
+            String keyProp = nodeName2keyProp.get(node);
+            String key = cell.key;
 
-                for (var cell : cells) {
+            String query = String.format(
+                    "MATCH (a:%s {%s: %s}) SET a.%s = %s",
+                    node, keyProp, key, prop, cell.value
+            );
 
-                    String node = cell.property.node;
-                    String property = cell.property.property;
-                    String keyColumn = nodeName2keyProp.get(node);
-
-                    Object value;
-
-                    if (property.equals("payload")) {
-                        value = cell.value;
-                    } else {
-                        try {
-                            value = Long.parseLong(cell.value);
-                        } catch (Exception e) {
-                            try {
-                                value = Float.parseFloat(cell.value);
-                            } catch (Exception e2) {
-                                value = cell.value;
-                            }
-                        }
-                    }
-
-                    String keyValue;
-
-                    try {
-                        Long.parseLong(cell.key);
-                        keyValue = cell.key;
-                    } catch (Exception e) {
-                        keyValue = "'" + cell.key.replace("'", "\\'") + "'";
-                    }
-
-                    String formattedValue;
-
-                    if (value instanceof String) {
-                        formattedValue = "'" + ((String) value).replace("'", "\\'") + "'";
-                    } else {
-                        formattedValue = value.toString();
-                    }
-
-                    String cypher =
-                            "MATCH (n:" + node + " {" + keyColumn + ": " + keyValue + "}) " +
-                                    "SET n." + property + " = " + formattedValue;
-
-                    Result rs = tx.run(cypher);
-                    ResultSummary summary = rs.consume();
-
-                    if (summary.counters().propertiesSet() != 1) {
-                        throw new Neo4jException("Unexpected number of updates");
-                    }
-                }
-
-                return null;
-            });
+            try (Session session = driver.session(sessionConfig)) {
+                session.executeWrite(tx -> {
+                    tx.run(query);
+                    return null;
+                });
+            }
         }
+    }
+
+    private long safeAsLong(Value value) {
+        if (value.type().name().equals("STRING")) {
+            return Long.parseLong(value.asString());
+        }
+        return value.asLong();
     }
 }
