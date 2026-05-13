@@ -1,0 +1,8 @@
+neo4j:
+  uri: neo4j://127.0.0.1:7687
+  username: neo4j
+  password: password
+  database: p2e2
+
+server:
+  port: 8080

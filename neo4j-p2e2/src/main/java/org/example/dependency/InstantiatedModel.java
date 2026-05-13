@@ -1,14 +1,14 @@
-package org.example;
+package org.example.dependency;
 
-import org.example.GraphDependencyRules.Cell;
+import org.example.dependency.Instantiator;
 import org.neo4j.driver.exceptions.Neo4jException;
 
 import java.util.*;
 
 public class InstantiatedModel {
-    HashMap<Cell, ArrayList<Cell.HyperEdge>> cell2Edge = new HashMap<>();
+    public HashMap<Cell, ArrayList<Cell.HyperEdge>> cell2Edge = new HashMap<>();
     HashMap<Cell, Long> instantiationTime = new HashMap<>();
-    LinkedList<HashSet<Cell>> treeLevels = new LinkedList<>();
+    public LinkedList<HashSet<Cell>> treeLevels = new LinkedList<>();
     HashMap<Cell, HashSet<Cell>> cell2Parents = new HashMap<>();
     long modelConstructionTime = 0L;
 
