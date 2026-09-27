@@ -1,0 +1,11 @@
+p1.avgQuotes,p1.avgreplies,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p1.avgRetweets,p1.totalLikes,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p1.MostUsedHashtagCount,p1.MostUsedHashtag,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p1.MostUsedHashtag,p1.avgreplies,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p1.pscore,p1.avgreplies,p1.avgRetweets,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p1.totalLikes,p2.username,p2.Likes,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalQuotes,p2.username,p2.quotes,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalReplies,p2.username,p2.replies,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.totalRetweets,p2.username,p2.retweets,FROM,public.profile p1,public.posts p2,WHERE,p1.profId = p2.profId
+p1.pscore,p1.avgLikes,FROM,public.profile p1,WHERE,p1.profid = p1.profid
+p2.timeposted,p2.postdata,FROM,public.posts p2,WHERE,p2.tweetid=p2.tweetid
